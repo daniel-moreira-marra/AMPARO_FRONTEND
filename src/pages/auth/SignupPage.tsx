@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 // import { useToast } from "@/hooks/use-toast"
 
 const signupSchema = z.object({
-    first_name: z.string().min(1, "Nome é obrigatório"),
-    last_name: z.string().min(1, "Sobrenome é obrigatório"),
+    full_name: z.string().min(1, "Nome completo é obrigatório"),
     email: z.string().email("Email inválido"),
+    phone: z.string().min(1, "Telefone é obrigatório"),
+    role: z.enum(["ELDER", "CAREGIVER", "FAMILY", "PROFESSIONAL", "INSTITUTION"]),
     password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
     confirmPassword: z.string().min(6, "Confirmação de senha obrigatória"),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -27,36 +29,94 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 export const SignupPage = () => {
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [globalError, setGlobalError] = useState<string | null>(null);
     const navigate = useNavigate();
 
-    const { register, handleSubmit, formState: { errors } } = useForm<SignupForm>({
+    const { register, handleSubmit, setValue, watch, setError, formState: { errors } } = useForm<SignupForm>({
         resolver: zodResolver(signupSchema),
+        defaultValues: {
+            role: "ELDER"
+        }
     });
+
+    useEffect(() => {
+        if (Object.keys(errors).length > 0) {
+            console.log("Form errors state changed:", errors);
+        }
+    }, [errors]);
 
     const onSubmit = async (data: SignupForm) => {
         setIsLoading(true);
-        setError(null);
+        setGlobalError(null);
         try {
-            // Adjust payload to match backend expectation if needed
-            // SignupView usually expects standard user fields
+            // Some backends might choke if an invalid/expired token is sent in the header even for public routes.
+            // We use the custom _skipAuth flag to prevent the interceptor from adding the token.
             await api.post("/auth/signup/", {
-                first_name: data.first_name,
-                last_name: data.last_name,
                 email: data.email,
                 password: data.password,
+                full_name: data.full_name,
+                phone: data.phone,
+                role: data.role
+            }, {
+                // @ts-ignore: Custom flag for interceptor
+                _skipAuth: true
             });
 
-            // Redirect to login with success message (simulated)
             navigate("/login", { state: { message: "Conta criada com sucesso! Faça login." } });
+
         } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            console.error(err);
-            if (err.response?.data) {
-                // Try to format backend validation errors
-                const msg = Object.values(err.response.data).flat().join(", ");
-                setError(msg || "Erro ao criar conta.");
+            console.error("Signup error catch:", err);
+
+            const responseData = err.response?.data;
+            if (responseData) {
+                // Handle Amparo structured error format
+                if (responseData.error) {
+                    const errorObj = responseData.error;
+
+                    // 1. Map details to field errors
+                    if (errorObj.details) {
+                        Object.keys(errorObj.details).forEach((key) => {
+                            const fieldKey = key as keyof SignupForm;
+                            const fieldMessages = errorObj.details[fieldKey];
+                            const firstMessage = Array.isArray(fieldMessages) ? fieldMessages[0] : null;
+
+                            if (firstMessage && typeof firstMessage === 'string') {
+                                setError(fieldKey, {
+                                    type: "manual",
+                                    message: firstMessage
+                                });
+                            }
+                        });
+                    }
+
+                    // 2. Set global error message
+                    if (errorObj.message) {
+                        setGlobalError(errorObj.message);
+                        return;
+                    }
+                }
+
+                // Fallback for non-structured or missing message
+                if (typeof responseData === 'string') {
+                    setGlobalError(responseData);
+                } else if (typeof responseData === 'object') {
+                    // Avoid [object Object] and false values
+                    const messages = Object.entries(responseData)
+                        .filter(([key]) => key !== 'success')
+                        .map(([_, v]) => {
+                            if (typeof v === 'string') return v;
+                            if (Array.isArray(v) && typeof v[0] === 'string') return v[0];
+                            if (v && typeof v === 'object' && (v as any).message) return (v as any).message;
+                            return null;
+                        })
+                        .filter(Boolean);
+
+                    setGlobalError(messages.length > 0 ? messages.join(", ") : "Erro ao criar conta.");
+                } else {
+                    setGlobalError("Erro ao criar conta.");
+                }
             } else {
-                setError("Ocorreu um erro ao criar conta. Tente novamente.");
+                setGlobalError("Ocorreu um erro ao entrar em contato com o servidor. Tente novamente.");
             }
         } finally {
             setIsLoading(false);
@@ -78,24 +138,44 @@ export const SignupPage = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="first_name">Nome</Label>
-                                <Input id="first_name" {...register("first_name")} />
-                                {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="last_name">Sobrenome</Label>
-                                <Input id="last_name" {...register("last_name")} />
-                                {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
-                            </div>
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+                        <div className="space-y-2">
+                            <Label htmlFor="full_name">Nome Completo</Label>
+                            <Input id="full_name" {...register("full_name")} />
+                            {errors.full_name && <p className="text-xs text-destructive">{errors.full_name.message}</p>}
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input id="email" type="email" placeholder="nome@exemplo.com" {...register("email")} />
                             {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="phone">Telefone</Label>
+                                <Input id="phone" placeholder="(00) 00000-0000" {...register("phone")} />
+                                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="role">Perfil</Label>
+                                <Select
+                                    onValueChange={(val: "ELDER" | "CAREGIVER" | "FAMILY" | "PROFESSIONAL" | "INSTITUTION") => setValue("role", val)}
+                                    defaultValue={watch("role") || "ELDER"}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ELDER">Idoso</SelectItem>
+                                        <SelectItem value="CAREGIVER">Cuidador</SelectItem>
+                                        <SelectItem value="FAMILY">Familiar</SelectItem>
+                                        <SelectItem value="PROFESSIONAL">Profissional</SelectItem>
+                                        <SelectItem value="INSTITUTION">Instituição</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -110,9 +190,9 @@ export const SignupPage = () => {
                             {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
                         </div>
 
-                        {error && (
+                        {globalError && (
                             <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm font-medium">
-                                {error}
+                                {globalError}
                             </div>
                         )}
 

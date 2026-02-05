@@ -11,8 +11,11 @@ export const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
-        // We will use local storage for token for now, or cookie if supported
-        // For MVP, simple localStorage
+        // Allow skipping auth header if specified in config (e.g. for signup/login)
+        if ((config as any)._skipAuth) {
+            return config;
+        }
+
         const token = localStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
