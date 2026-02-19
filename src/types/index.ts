@@ -29,6 +29,9 @@ export interface PaginatedResponse<T> {
 }
 
 export interface AuthResponse {
-    access: string;
-    refresh: string;
+    success: boolean;
+    data: {
+        access: string;
+        refresh: string;
+    };
 }

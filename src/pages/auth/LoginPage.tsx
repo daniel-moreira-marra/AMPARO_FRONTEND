@@ -42,7 +42,7 @@ export const LoginPage = () => {
         setError(null);
         try {
             const response = await api.post<AuthResponse>("/auth/token/", data);
-            const { access, refresh } = response.data;
+            const { access, refresh } = response.data.data;
 
             // Set token in localStorage for interceptor
             localStorage.setItem("access_token", access);

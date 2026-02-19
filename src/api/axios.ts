@@ -12,7 +12,8 @@ export const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         // Allow skipping auth header if specified in config (e.g. for signup/login)
-        if ((config as any)._skipAuth) {
+        // Also skip for /auth/token/ endpoint to prevent sending stale tokens
+        if ((config as any)._skipAuth || config.url?.endsWith('/auth/token/')) {
             return config;
         }
 
