@@ -4,22 +4,7 @@ import { HeartHandshake } from "lucide-react";
 
 export const LandingPage = () => {
     return (
-        <div className="flex flex-col min-h-screen bg-gradient-to-b from-blue-50 to-white">
-            <header className="px-6 h-16 flex items-center justify-between max-w-7xl mx-auto w-full">
-                <div className="flex items-center gap-2">
-                    <HeartHandshake className="h-8 w-8 text-primary" />
-                    <span className="text-xl font-semibold text-primary">Amparo</span>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Link to="/login">
-                        <Button variant="ghost">Entrar</Button>
-                    </Link>
-                    <Link to="/signup">
-                        <Button>Criar Conta</Button>
-                    </Link>
-                </div>
-            </header>
-
+        <div className="flex flex-col flex-1 bg-gradient-to-b from-blue-50 to-white">
             <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-20 max-w-4xl mx-auto space-y-8">
                 <div className="space-y-4">
                     <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-gray-900">

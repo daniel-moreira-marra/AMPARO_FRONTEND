@@ -17,6 +17,9 @@ const createPostSchema = z.object({
 export const CreatePostWidget = () => {
     const { mutate: createPost, isPending } = useCreatePost();
     const user = useAuthStore((state) => state.user);
+    const displayName = user?.full_name?.trim() || "Usuário";
+    const firstName = displayName.split(" ")[0] || "Usuário";
+    const avatarInitial = firstName.charAt(0).toUpperCase();
     const { register, handleSubmit, reset } = useForm<{ content: string }>({
         resolver: zodResolver(createPostSchema),
     });
@@ -43,13 +46,13 @@ export const CreatePostWidget = () => {
             <CardContent className="p-4 space-y-4">
                 <div className="flex gap-4">
                     <Avatar>
-                        <AvatarFallback>{user?.first_name?.[0].toUpperCase() || "U"}</AvatarFallback>
+                        <AvatarFallback>{avatarInitial}</AvatarFallback>
                     </Avatar>
                     <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-4">
                         <div className="relative">
                             <textarea
                                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y"
-                                placeholder={`O que você está pensando, ${user?.first_name || 'hoje'}?`}
+                                placeholder={`O que você está pensando, ${firstName}?`}
                                 {...register("content")}
                             />
                         </div>

@@ -8,6 +8,7 @@ import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { LinksPage } from "@/pages/links/LinksPage";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { BaseLayout } from "@/components/layout/BaseLayout";
+import { PublicLayout } from "@/components/layout/PublicLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,9 +25,11 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+          </Route>
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>

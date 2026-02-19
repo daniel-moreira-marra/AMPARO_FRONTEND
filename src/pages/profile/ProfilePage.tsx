@@ -8,6 +8,8 @@ export const ProfilePage = () => {
     const user = useAuthStore((state) => state.user);
 
     if (!user) return null;
+    const fullName = user.full_name?.trim() || "Usuário";
+    const initial = fullName.charAt(0).toUpperCase();
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -18,12 +20,12 @@ export const ProfilePage = () => {
                     <Avatar className="h-24 w-24">
                         <AvatarImage src="" /> {/* Avatar URL would be here if user has one */}
                         <AvatarFallback className="text-2xl">
-                            {user.first_name[0].toUpperCase()}
+                            {initial}
                         </AvatarFallback>
                     </Avatar>
                     <div className="text-center sm:text-left space-y-1">
                         <CardTitle className="text-2xl">
-                            {user.first_name} {user.last_name}
+                            {fullName}
                         </CardTitle>
                         <p className="text-muted-foreground flex items-center justify-center sm:justify-start gap-2">
                             <Mail className="h-4 w-4" />
@@ -42,7 +44,7 @@ export const ProfilePage = () => {
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-1">
                             <span className="text-sm font-medium text-muted-foreground">Nome Completo</span>
-                            <p>{user.first_name} {user.last_name}</p>
+                            <p>{fullName}</p>
                         </div>
                         <div className="space-y-1">
                             <span className="text-sm font-medium text-muted-foreground">ID do Usuário</span>
