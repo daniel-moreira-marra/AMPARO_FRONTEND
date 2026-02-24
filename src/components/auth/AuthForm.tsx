@@ -1,14 +1,15 @@
 import type { ReactNode, FormEvent } from "react";
-import { useState } from "react";
 
 type AuthFormProps = {
   title: string;
   description?: string;
   submitLabel: string;
   children: ReactNode;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => Promise<void> | void;
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   footer?: ReactNode;
   headerIcon?: ReactNode;
+  error?: string | null;
+  isLoading?: boolean;
 };
 
 export default function AuthForm({
@@ -19,26 +20,11 @@ export default function AuthForm({
   onSubmit,
   footer,
   headerIcon,
+  error,
+  isLoading = false,
 }: AuthFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
-    try {
-      await onSubmit(e);
-    } catch (err: any) {
-      setError(err?.message || "Algo deu errado. Tente novamente.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={onSubmit} className="space-y-6">
 
       {/* HEADER */}
       <div className="text-center">
@@ -48,7 +34,7 @@ export default function AuthForm({
           </div>
         )}
 
-        <h2 className="text-2xl font-semibold text-text">
+        <h2 className="text-2xl font-semibold text-primary">
           {title}
         </h2>
 
@@ -80,7 +66,7 @@ export default function AuthForm({
       {/* SUBMIT */}
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isLoading}
         className="
           w-full h-12
           rounded-xl
@@ -88,17 +74,17 @@ export default function AuthForm({
           text-white
           transition-all duration-200
           bg-blue
-          hover:bg-primary/90
+          hover:bg-blue/70
           active:scale-[0.99]
           disabled:opacity-60
           disabled:cursor-not-allowed
           shadow-lg
         "
       >
-        {isSubmitting ? (
+        {isLoading ? (
           <span className="flex items-center justify-center gap-2">
             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            processando...
+            Processando...
           </span>
         ) : (
           submitLabel

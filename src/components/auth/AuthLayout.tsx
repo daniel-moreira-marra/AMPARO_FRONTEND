@@ -24,7 +24,7 @@ export default function AuthLayout({ hero, children }: AuthLayoutProps) {
       )}
 
       {/* RIGHT SIDE — FORM */}
-      <div className="flex flex-1 items-center justify-center px-6 py-10">
+      <div className="flex flex-1 items-center justify-center px-6 py-10 bg-neutral-50">
         
         <div className="w-full max-w-md">
           
