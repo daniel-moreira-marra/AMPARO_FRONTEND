@@ -9,6 +9,7 @@ import { LinksPage } from "@/pages/links/LinksPage";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { BaseLayout } from "@/components/layout/BaseLayout";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import Login from "./pages/auth/Login";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +26,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+
           <Route element={<PublicLayout />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
