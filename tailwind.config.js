@@ -7,6 +7,9 @@ module.exports = {
 
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Nunito", "sans-serif"],
+      },
       colors: {
         primary: "rgb(var(--primary) / <alpha-value>)",
         "primary-light": "rgb(var(--primary-light) / <alpha-value>)",

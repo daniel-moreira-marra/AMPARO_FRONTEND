@@ -7,10 +7,15 @@ import { useNavigate, Link } from "react-router-dom";
 import AuthLayout from "@/components/auth/AuthLayout";
 import AuthHero from "@/components/auth/AuthHero";
 import AuthForm from "@/components/auth/AuthForm";
+
 import { api } from "@/api/axios";
+import { maskPhone, maskCEP } from "@/utils/masks";
+import { Eye, EyeOff } from "lucide-react";
 
 
-// ================= ROLES =================
+// ======================================================
+// ROLES
+// ======================================================
 
 const ROLE_OPTIONS = [
   { value: "ELDER", label: "Idoso" },
@@ -21,32 +26,75 @@ const ROLE_OPTIONS = [
 ] as const;
 
 
-// ================= VALIDATION =================
+// ======================================================
+// VALIDATION
+// ======================================================
 
-const schema = z.object({
+const signupSchema = z.object({
+
+  // STEP 1
   full_name: z.string().min(2, "Informe seu nome completo"),
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Mínimo 6 caracteres"),
-  confirm_password: z.string(),
-  role: z.enum(["ELDER", "CAREGIVER", "FAMILY", "PROFESSIONAL", "INSTITUTION"]),
+  password: z
+  .string()
+  .min(6, "A senha deve ter pelo menos 6 caracteres")
+  .superRefine((value, ctx) => {
 
-  phone: z.string().min(8, "Telefone inválido"),
+    if (!/[A-Z]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 letra maiúscula",
+      });
+    }
+
+    if (!/[a-z]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 letra minúscula",
+      });
+    }
+
+    if (!/[0-9]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 número",
+      });
+    }
+
+    if (!/[^A-Za-z0-9]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 caractere especial",
+      });
+    }
+
+  }),
+  confirm_password: z.string(),
+  role: z.string().min(1, "Selecione o seu perfil"),
+
+  // STEP 2
+  phone: z.string().min(14, "Telefone inválido"),
   address_line: z.string().min(3, "Informe o endereço"),
   city: z.string().min(2, "Informe a cidade"),
   state: z.string().min(2, "Informe o estado"),
-  zip_code: z.string().min(5, "CEP inválido"),
-})
-.refine(data => data.password === data.confirm_password, {
-  path: ["confirm_password"],
-  message: "As senhas não coincidem",
-});
+  zip_code: z.string().min(9, "CEP inválido"),
 
-type FormData = z.infer<typeof schema>;
+}).refine(
+  (data) => data.password === data.confirm_password,
+  {
+    path: ["confirm_password"],
+    message: "As senhas não coincidem",
+  }
+);
+
+type SignupForm = z.infer<typeof signupSchema>;
 
 
-// ================= PAGE =================
+// ======================================================
+// PAGE
+// ======================================================
 
-export default function Signup() {
+export default function SignupPage() {
 
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -57,51 +105,79 @@ export default function Signup() {
     handleSubmit,
     control,
     trigger,
+    getValues,
+    setError,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { role: "ELDER" },
+  } = useForm<SignupForm>({
+    resolver: zodResolver(signupSchema),
+    criteriaMode: "all",
+    defaultValues: {
+      role: "",
+      phone: "",
+      zip_code: "",
+    },
   });
 
 
-  // ================= STEP VALIDATION =================
+  // ======================================================
+  // STEP CONTROL
+  // ======================================================
 
-  async function nextStep() {
-    const fields =
-      step === 1
-        ? ["full_name", "email", "password", "confirm_password", "role"]
-        : ["phone", "address_line", "city", "state", "zip_code"];
+  async function handleNextStep() {
 
-    const valid = await trigger(fields as any);
-    if (valid) setStep(s => s + 1);
+    const step1Fields = [
+      "full_name",
+      "email",
+      "password",
+      "confirm_password",
+      "role",
+    ] as const;
+
+    const valid = await trigger(step1Fields);
+    if (!valid) return;
+
+    // ✅ validação manual das senhas
+    const password = getValues("password");
+    const confirm = getValues("confirm_password");
+
+    if (password !== confirm) {
+      setError("confirm_password", {
+        type: "manual",
+        message: "As senhas não coincidem",
+      });
+      return;
+    }
+
+    setStep(2);
   }
 
-  function prevStep() {
-    setStep(s => s - 1);
+  function handlePrevStep() {
+    setStep(1);
   }
 
 
-  // ================= SUBMIT =================
+  // ======================================================
+  // SUBMIT
+  // ======================================================
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: SignupForm) => {
     setServerError(null);
 
-    const payload = {
-      email: data.email,
-      password: data.password,
-      full_name: data.full_name,
-      phone: data.phone,
-      role: data.role,
-      address_line: data.address_line,
-      city: data.city,
-      state: data.state,
-      zip_code: data.zip_code,
-    };
-
     try {
-      await api.post("/auth/signup/", payload);
 
-      navigate("/login", {
+      await api.post("/auth/signup/", {
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+        phone: data.phone,
+        role: data.role,
+        address_line: data.address_line,
+        city: data.city,
+        state: data.state,
+        zip_code: data.zip_code,
+      });
+
+      navigate("/feed", {
         replace: true,
         state: { message: "Conta criada com sucesso" },
       });
@@ -123,7 +199,9 @@ export default function Signup() {
   };
 
 
-  // ================= UI =================
+  // ======================================================
+  // UI
+  // ======================================================
 
   return (
     <AuthLayout
@@ -131,7 +209,7 @@ export default function Signup() {
         <AuthHero
           logo={<img src="/images/logo-amparo.svg" className="w-40" />}
           title="Cuidar de quem importa, juntos"
-          subtitle="Crie sua conta em poucos passos."
+          subtitle="Conecte-se a uma rede de cuidado, apoio e confiança para viver e cuidar melhor todos os dias."
           imageSrc="/images/auth-hero2.jpeg"
         />
       }
@@ -140,8 +218,8 @@ export default function Signup() {
         headerIcon={<img src="/images/amparo-icon.svg" className="w-10" />}
         title="Criar conta"
         description={`Etapa ${step} de 2`}
-        submitLabel={step === 2 ? "Criar conta" : "Continuar"}
-        onSubmit={step === 2 ? handleSubmit(onSubmit) : e => { e.preventDefault(); nextStep(); }}
+        submitLabel={step === 1 ? "Continuar" : "Criar conta"}
+        onSubmit={step === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit(onSubmit)}
         error={serverError}
         isLoading={isSubmitting}
         footer={
@@ -154,65 +232,109 @@ export default function Signup() {
         }
       >
 
+        {/* ======================================================
+            STEP 1
+        ====================================================== */}
+
         {step === 1 && (
           <>
-            <Field label="Nome completo" error={errors.full_name?.message}>
-              <input {...register("full_name")} placeholder="Seu nome completo" className={input} />
-            </Field>
+            <Input label="Nome completo" error={errors.full_name?.message}>
+              <input {...register("full_name")} placeholder="Seu nome completo" className={inputClass} />
+            </Input>
 
-            <Field label="Email" error={errors.email?.message}>
-              <input {...register("email")} placeholder="seu@email.com" className={input} />
-            </Field>
+            <Input label="Email" error={errors.email?.message}>
+              <input type="email" {...register("email")} placeholder="seu@email.com" className={inputClass} />
+            </Input>
 
-            <Field label="Senha" error={errors.password?.message}>
-              <input type="password" {...register("password")} placeholder="Crie uma senha segura" className={input} />
-            </Field>
+            <PasswordInput
+              label="Senha"
+              error={errors.password?.message}
+              register={register("password")}
+            />
 
-            <Field label="Confirmar senha" error={errors.confirm_password?.message}>
-              <input type="password" {...register("confirm_password")} placeholder="Repita sua senha" className={input} />
-            </Field>
+            <PasswordInput
+              label="Confirmar senha"
+              error={errors.confirm_password?.message}
+              register={register("confirm_password", {
+                validate: v =>
+                  v === getValues("password") || "As senhas não coincidem",
+              })}
+            />
 
-            <Field label="Perfil" error={errors.role?.message}>
+
+            <Input label="Perfil" error={errors.role?.message}>
               <Controller
-                control={control}
                 name="role"
+                control={control}
                 render={({ field }) => (
-                  <select {...field} className={input}>
+                  <select {...field} className={inputClass}>
+                    <option value="">Selecione o seu perfil</option>
                     {ROLE_OPTIONS.map(r => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
                     ))}
                   </select>
                 )}
               />
-            </Field>
+            </Input>
           </>
         )}
 
+
+        {/* ======================================================
+            STEP 2
+        ====================================================== */}
+
         {step === 2 && (
           <>
-            <Field label="Telefone" error={errors.phone?.message}>
-              <input {...register("phone")} placeholder="(11) 99999-9999" className={input} />
-            </Field>
+            <Input label="Telefone" error={errors.phone?.message}>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    maxLength={15}
+                    onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                    placeholder="(11) 99999-9999"
+                    className={inputClass}
+                  />
+                )}
+              />
+            </Input>
 
-            <Field label="Endereço" error={errors.address_line?.message}>
-              <input {...register("address_line")} placeholder="Rua, número e complemento" className={input} />
-            </Field>
+            <Input label="Endereço" error={errors.address_line?.message}>
+              <input {...register("address_line")} placeholder="Rua, número e complemento" className={inputClass} />
+            </Input>
 
-            <Field label="Cidade" error={errors.city?.message}>
-              <input {...register("city")} placeholder="Sua cidade" className={input} />
-            </Field>
+            <Input label="Cidade" error={errors.city?.message}>
+              <input {...register("city")} placeholder="Sua cidade" className={inputClass} />
+            </Input>
 
-            <Field label="Estado" error={errors.state?.message}>
-              <input {...register("state")} placeholder="UF" className={input} />
-            </Field>
+            <Input label="Estado" error={errors.state?.message}>
+              <input {...register("state")} placeholder="UF" className={inputClass} maxLength={2} />
+            </Input>
 
-            <Field label="CEP" error={errors.zip_code?.message}>
-              <input {...register("zip_code")} placeholder="00000-000" className={input} />
-            </Field>
+            <Input label="CEP" error={errors.zip_code?.message}>
+              <Controller
+                name="zip_code"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    maxLength={9}
+                    onChange={(e) => field.onChange(maskCEP(e.target.value))}
+                    placeholder="00000-000"
+                    className={inputClass}
+                  />
+                )}
+              />
+            </Input>
 
             <button
               type="button"
-              onClick={prevStep}
+              onClick={handlePrevStep}
               className="text-sm text-text/70 hover:underline pt-2"
             >
               Voltar
@@ -226,14 +348,60 @@ export default function Signup() {
 }
 
 
-// ================= UI HELPERS =================
+// ======================================================
+// PASSWORD INPUT
+// ======================================================
 
-const input = `
+function PasswordInput({ label, error, register }: any) {
+
+  const [visible, setVisible] = useState(false);
+  const errorMessages =
+  error?.types ? Object.values(error.types) : error ? [error] : [];
+
+
+  return (
+    <div className="space-y-1">
+      <label className="text-sm font-medium text-text">{label}</label>
+
+      <div className="relative">
+        <input
+          type={visible ? "text" : "password"}
+          {...register}
+          className={`${inputClass} pr-12`}
+          placeholder="••••••••"
+        />
+
+        <button
+          type="button"
+          onClick={() => setVisible(v => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-text/60 hover:text-text"
+        >
+          {visible ? <EyeOff size={20}/> : <Eye size={20}/>}
+        </button>
+      </div>
+
+      {errorMessages.length > 0 && (
+        <ul className="text-sm text-red-500 space-y-1">
+          {errorMessages.map((msg: string, i: number) => (
+            <li key={i}>• {msg}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+
+// ======================================================
+// INPUT COMPONENT
+// ======================================================
+
+const inputClass = `
 w-full h-12 px-4 rounded-xl border border-border
 focus:ring-2 focus:ring-primary/40 focus:border-primary
 `;
 
-function Field({ label, error, children }: any) {
+function Input({ label, error, children }: any) {
   return (
     <div className="space-y-1">
       <label className="text-sm font-medium text-text">{label}</label>
