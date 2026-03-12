@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { LandingPage } from "@/pages/LandingPage";
-import { LoginPage } from "@/pages/auth/LoginPage";
 import { SignupPage } from "@/pages/auth/SignupPage";
 import { FeedPage } from "@/pages/feed/FeedPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
@@ -9,6 +8,8 @@ import { LinksPage } from "@/pages/links/LinksPage";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { BaseLayout } from "@/components/layout/BaseLayout";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import LoginPage from "./pages/auth/LoginPage";
+import Signup from "./pages/auth/SignUp";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,10 +26,13 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
+
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<Signup />} />
           <Route element={<PublicLayout />}>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+            
+            <Route path="/register" element={<SignupPage />} />
           </Route>
 
           {/* Protected Routes */}

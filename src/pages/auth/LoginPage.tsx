@@ -2,134 +2,162 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import { HeartHandshake } from "lucide-react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+
+import AuthLayout from "@/components/auth/AuthLayout";
+import AuthHero from "@/components/auth/AuthHero";
+import AuthForm from "@/components/auth/AuthForm";
 
 import { useAuthStore } from "@/store/useAuthStore";
 import { api } from "@/api/axios";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-// import { jwtDecode } from "jwt-decode";
+
 import type { User } from "@/types";
 import type { AuthResponse } from "@/types";
 
+
+// ================= VALIDATION =================
+
 const loginSchema = z.object({
-    email: z.string().email("Email inválido"),
-    password: z.string().min(1, "A senha é obrigatória"),
+  email: z.string().email("Email inválido"),
+  password: z.string().min(1, "Informe sua senha"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-export const LoginPage = () => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const setAuth = useAuthStore((state) => state.setAuth);
-    const navigate = useNavigate();
-    const location = useLocation();
 
-    // Redirect to where they wanted to go, or feed
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const from = (location.state as any)?.from?.pathname || "/feed";
+// ================= PAGE =================
 
-    const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-        resolver: zodResolver(loginSchema),
-    });
+export default function LoginPage() {
 
-    const onSubmit = async (data: LoginForm) => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await api.post<AuthResponse>("/auth/token/", data);
-            const { access, refresh } = response.data.data;
+  const [serverError, setServerError] = useState<string | null>(null);
 
-            // Set token in localStorage for interceptor
-            localStorage.setItem("access_token", access);
-            localStorage.setItem("refresh_token", refresh);
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-            // Get user info (Assuming MeView structure or decoding token if it has info)
-            // For now, let's fetch /auth/me/ to get user details properly
-            // But wait, checking the backend route... it's /api/v1/auth/me/
+  const from = (location.state as any)?.from?.pathname || "/feed";
 
-            const meResponse = await api.get("/auth/me/");
-            const user: User = meResponse.data;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+  });
 
-            setAuth(access, refresh, user);
-            navigate(from, { replace: true });
-        } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            console.error(err);
-            if (err.response?.status === 401) {
-                setError("Credenciais inválidas. Verifique seu email e senha.");
-            } else {
-                setError("Ocorreu um erro ao entrar. Tente novamente mais tarde.");
-            }
-        } finally {
-            setIsLoading(false);
+
+  // ================= SUBMIT =================
+
+  const onSubmit = async (data: LoginForm) => {
+    setServerError(null);
+
+    try {
+      const response = await api.post<AuthResponse>("/auth/token/", data);
+      const { access, refresh } = response.data.data;
+
+      localStorage.setItem("access_token", access);
+      localStorage.setItem("refresh_token", refresh);
+
+      const meResponse = await api.get("/auth/me/");
+      const user: User = meResponse.data;
+
+      setAuth(access, refresh, user);
+      navigate(from, { replace: true });
+
+    } catch (err: any) {
+
+      // Credenciais inválidas
+      if (err.response?.status === 401 || err.response?.status === 400) {
+        setServerError("Credenciais inválidas. Verifique seu email e senha.");
+        return;
+      }
+
+      // Erro do servidor
+      if (err.response) {
+        setServerError("Ocorreu um erro. Tente novamente mais tarde.");
+        return;
+      }
+
+      // Falha de conexão
+      setServerError("Falha de conexão. Verifique sua internet.");
+    }
+  };
+
+
+  // ================= UI =================
+
+  return (
+    <AuthLayout
+      hero={
+        <AuthHero
+          logo={<img src="/images/logo-amparo.svg" className="w-40" />}
+          title="Cuidar de quem importa, juntos"
+          subtitle="Conectando pessoas idosas, famílias e profissionais de saúde com segurança, acolhimento e confiança."
+          imageSrc="/images/auth-hero2.jpeg"
+        />
+      }
+    >
+      <AuthForm
+        headerIcon={<img src="/images/amparo-icon.svg" className="w-10" />}
+        title="Bem-vindo de volta"
+        description="Entre com seus dados para acessar sua conta"
+        submitLabel="Entrar"
+        onSubmit={handleSubmit(onSubmit)}
+        error={serverError}
+        isLoading={isSubmitting}
+        footer={
+          <div className="space-y-2">
+            <p>
+              Não tem uma conta?{" "}
+              <Link to="/signup" className="text-primary font-medium hover:underline">
+                Criar conta
+              </Link>
+            </p>
+
+            <Link to="/forgot-password" className="text-blue hover:underline">
+              Esqueceu sua senha?
+            </Link>
+          </div>
         }
-    };
+      >
 
-    return (
-        <div className="flex flex-1 items-center justify-center px-4 py-8">
-            <Card className="w-full max-w-md">
-                <CardHeader className="space-y-1 text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <HeartHandshake className="h-6 w-6" />
-                        </div>
-                    </div>
-                    <CardTitle className="text-2xl font-bold">Entrar no Amparo</CardTitle>
-                    <CardDescription>
-                        Digite seu email e senha para acessar sua conta
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="nome@exemplo.com"
-                                {...register("email")}
-                            />
-                            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-                        </div>
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="password">Senha</Label>
-                                <Link to="#" className="text-sm text-primary hover:underline">
-                                    Esqueceu a senha?
-                                </Link>
-                            </div>
-                            <Input
-                                id="password"
-                                type="password"
-                                {...register("password")}
-                            />
-                            {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-                        </div>
+        {/* EMAIL */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-text">Email</label>
 
-                        {error && (
-                            <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm font-medium">
-                                {error}
-                            </div>
-                        )}
+          <input
+            type="email"
+            {...register("email")}
+            placeholder="seu@email.com"
+            className="w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary"
+          />
 
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? "Entrando..." : "Entrar"}
-                        </Button>
-                    </form>
-                </CardContent>
-                <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
-                    <div>
-                        Não tem uma conta?{" "}
-                        <Link to="/signup" className="text-primary hover:underline font-medium">
-                            Cadastre-se
-                        </Link>
-                    </div>
-                </CardFooter>
-            </Card>
+          {errors.email && (
+            <p className="text-sm text-red-500">
+              {errors.email.message}
+            </p>
+          )}
         </div>
-    );
-};
+
+        {/* PASSWORD */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-text">Senha</label>
+
+          <input
+            type="password"
+            {...register("password")}
+            placeholder="••••••••"
+            className="w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary"
+          />
+
+          {errors.password && (
+            <p className="text-sm text-red-500">
+              {errors.password.message}
+            </p>
+          )}
+        </div>
+
+      </AuthForm>
+    </AuthLayout>
+  );
+}
