@@ -3,6 +3,7 @@ export interface User {
     email: string;
     full_name: string;
     phone?: string;
+    is_verified: boolean;
     role?: 'ELDER' | 'CAREGIVER' | 'FAMILY' | 'PROFESSIONAL' | 'INSTITUTION';
 }
 

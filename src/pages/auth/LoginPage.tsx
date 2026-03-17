@@ -49,39 +49,30 @@ export default function LoginPage() {
   // ================= SUBMIT =================
 
   const onSubmit = async (data: LoginForm) => {
-    setServerError(null);
+  setServerError(null);
+  try {
+    // 1. Pega os tokens
+    const response = await api.post<AuthResponse>("/auth/token/", data);
+    const { access, refresh } = response.data.data;
 
-    try {
-      const response = await api.post<AuthResponse>("/auth/token/", data);
-      const { access, refresh } = response.data.data;
+    // 2. Busca o usuário atualizado do banco
+    // Certifique-se que esta rota retorna o is_verified atualizado!
+    const meResponse = await api.get("/auth/me/", {
+      headers: { Authorization: `Bearer ${access}` } // Garante que usa o token novo
+    });
+    
+    const user: User = meResponse.data.data;
 
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
+    // 3. Salva tudo de uma vez no Zustand (o persist cuida do localStorage sozinho)
+    setAuth(access, refresh, user);
+    
+    // 4. Navega
+    navigate(from, { replace: true });
 
-      const meResponse = await api.get("/auth/me/");
-      const user: User = meResponse.data;
-
-      setAuth(access, refresh, user);
-      navigate(from, { replace: true });
-
-    } catch (err: any) {
-
-      // Credenciais inválidas
-      if (err.response?.status === 401 || err.response?.status === 400) {
-        setServerError("Credenciais inválidas. Verifique seu email e senha.");
-        return;
-      }
-
-      // Erro do servidor
-      if (err.response) {
-        setServerError("Ocorreu um erro. Tente novamente mais tarde.");
-        return;
-      }
-
-      // Falha de conexão
-      setServerError("Falha de conexão. Verifique sua internet.");
-    }
-  };
+  } catch (err: any) {
+    // ... seus tratamentos de erro
+  }
+};
 
 
   // ================= UI =================

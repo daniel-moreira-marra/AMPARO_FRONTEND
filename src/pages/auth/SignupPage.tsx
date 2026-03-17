@@ -1,215 +1,412 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate, Link } from "react-router-dom";
-import { HeartHandshake } from "lucide-react";
+
+import AuthLayout from "@/components/auth/AuthLayout";
+import AuthHero from "@/components/auth/AuthHero";
+import AuthForm from "@/components/auth/AuthForm";
 
 import { api } from "@/api/axios";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { useToast } from "@/hooks/use-toast"
+import { maskPhone, maskCEP } from "@/utils/masks";
+import { Eye, EyeOff } from "lucide-react";
+
+
+// ======================================================
+// ROLES
+// ======================================================
+
+const ROLE_OPTIONS = [
+  { value: "ELDER", label: "Idoso" },
+  { value: "CAREGIVER", label: "Cuidador" },
+  { value: "FAMILY", label: "Familiar" },
+  { value: "PROFESSIONAL", label: "Profissional" },
+  { value: "INSTITUTION", label: "Instituição" },
+] as const;
+
+
+// ======================================================
+// VALIDATION
+// ======================================================
 
 const signupSchema = z.object({
-    full_name: z.string().min(1, "Nome completo é obrigatório"),
-    email: z.string().email("Email inválido"),
-    phone: z.string().min(1, "Telefone é obrigatório"),
-    role: z.enum(["ELDER", "CAREGIVER", "FAMILY", "PROFESSIONAL", "INSTITUTION"]),
-    password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
-    confirmPassword: z.string().min(6, "Confirmação de senha obrigatória"),
-}).refine((data) => data.password === data.confirmPassword, {
-    message: "As senhas não conferem",
-    path: ["confirmPassword"],
-});
+
+  // STEP 1
+  full_name: z.string().min(2, "Informe seu nome completo"),
+  email: z.string().email("Email inválido"),
+  password: z
+  .string()
+  .min(6, "A senha deve ter pelo menos 6 caracteres")
+  .superRefine((value, ctx) => {
+
+    if (!/[A-Z]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 letra maiúscula",
+      });
+    }
+
+    if (!/[a-z]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 letra minúscula",
+      });
+    }
+
+    if (!/[0-9]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 número",
+      });
+    }
+
+    if (!/[^A-Za-z0-9]/.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deve conter pelo menos 1 caractere especial",
+      });
+    }
+
+  }),
+  confirm_password: z.string(),
+  role: z.string().min(1, "Selecione o seu perfil"),
+
+  // STEP 2
+  phone: z.string().min(14, "Telefone inválido"),
+  address_line: z.string().min(3, "Informe o endereço"),
+  city: z.string().min(2, "Informe a cidade"),
+  state: z.string().min(2, "Informe o estado"),
+  zip_code: z.string().min(9, "CEP inválido"),
+
+}).refine(
+  (data) => data.password === data.confirm_password,
+  {
+    path: ["confirm_password"],
+    message: "As senhas não coincidem",
+  }
+);
 
 type SignupForm = z.infer<typeof signupSchema>;
 
-export const SignupPage = () => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [globalError, setGlobalError] = useState<string | null>(null);
-    const navigate = useNavigate();
 
-    const { register, handleSubmit, setValue, watch, setError, formState: { errors } } = useForm<SignupForm>({
-        resolver: zodResolver(signupSchema),
-        defaultValues: {
-            role: "ELDER"
+// ======================================================
+// PAGE
+// ======================================================
+
+export default function SignupPage() {
+
+  const [step, setStep] = useState(1);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    trigger,
+    getValues,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupForm>({
+    resolver: zodResolver(signupSchema),
+    criteriaMode: "all",
+    defaultValues: {
+      role: "",
+      phone: "",
+      zip_code: "",
+    },
+  });
+
+
+  // ======================================================
+  // STEP CONTROL
+  // ======================================================
+
+  async function handleNextStep() {
+
+    const step1Fields = [
+      "full_name",
+      "email",
+      "password",
+      "confirm_password",
+      "role",
+    ] as const;
+
+    const valid = await trigger(step1Fields);
+    if (!valid) return;
+
+    // ✅ validação manual das senhas
+    const password = getValues("password");
+    const confirm = getValues("confirm_password");
+
+    if (password !== confirm) {
+      setError("confirm_password", {
+        type: "manual",
+        message: "As senhas não coincidem",
+      });
+      return;
+    }
+
+    setStep(2);
+  }
+
+  function handlePrevStep() {
+    setStep(1);
+  }
+
+
+  // ======================================================
+  // SUBMIT
+  // ======================================================
+
+  const onSubmit = async (data: SignupForm) => {
+    setServerError(null);
+
+    try {
+
+      await api.post("/auth/signup/", {
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+        phone: data.phone,
+        role: data.role,
+        address_line: data.address_line,
+        city: data.city,
+        state: data.state,
+        zip_code: data.zip_code,
+      });
+
+      navigate("/signup-success", {
+        replace: true,
+        state: { message: "Conta criada com sucesso" },
+      });
+
+    } catch (err: any) {
+
+      if (err.response?.status === 400) {
+        setServerError("Dados inválidos. Revise as informações.");
+        return;
+      }
+
+      if (err.response) {
+        setServerError("Ocorreu um erro. Tente novamente mais tarde.");
+        return;
+      }
+
+      setServerError("Falha de conexão. Verifique sua internet.");
+    }
+  };
+
+
+  // ======================================================
+  // UI
+  // ======================================================
+
+  return (
+    <AuthLayout
+      hero={
+        <AuthHero
+          logo={<img src="/images/logo-amparo.svg" className="w-40" />}
+          title="Cuidar de quem importa, juntos"
+          subtitle="Conecte-se a uma rede de cuidado, apoio e confiança para viver e cuidar melhor todos os dias."
+          imageSrc="/images/auth-hero2.jpeg"
+        />
+      }
+    >
+      <AuthForm
+        headerIcon={<img src="/images/amparo-icon.svg" className="w-10" />}
+        title="Criar conta"
+        description={`Etapa ${step} de 2`}
+        submitLabel={step === 1 ? "Continuar" : "Criar conta"}
+        onSubmit={step === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit(onSubmit)}
+        error={serverError}
+        isLoading={isSubmitting}
+        footer={
+          <p>
+            Já possui uma conta?{" "}
+            <Link to="/login" className="text-primary font-medium hover:underline">
+              Fazer login
+            </Link>
+          </p>
         }
-    });
+      >
 
-    useEffect(() => {
-        if (Object.keys(errors).length > 0) {
-            console.log("Form errors state changed:", errors);
-        }
-    }, [errors]);
+        {/* ======================================================
+            STEP 1
+        ====================================================== */}
 
-    const onSubmit = async (data: SignupForm) => {
-        setIsLoading(true);
-        setGlobalError(null);
-        try {
-            // Some backends might choke if an invalid/expired token is sent in the header even for public routes.
-            // We use the custom _skipAuth flag to prevent the interceptor from adding the token.
-            await api.post("/auth/signup/", {
-                email: data.email,
-                password: data.password,
-                full_name: data.full_name,
-                phone: data.phone,
-                role: data.role
-            }, {
-                // @ts-ignore: Custom flag for interceptor
-                _skipAuth: true
-            });
+        {step === 1 && (
+          <>
+            <Input label="Nome completo" error={errors.full_name?.message}>
+              <input {...register("full_name")} placeholder="Seu nome completo" className={inputClass} />
+            </Input>
 
-            navigate("/login", { state: { message: "Conta criada com sucesso! Faça login." } });
+            <Input label="Email" error={errors.email?.message}>
+              <input type="email" {...register("email")} placeholder="seu@email.com" className={inputClass} />
+            </Input>
 
-        } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            console.error("Signup error catch:", err);
+            <PasswordInput
+              label="Senha"
+              error={errors.password?.message}
+              register={register("password")}
+            />
 
-            const responseData = err.response?.data;
-            if (responseData) {
-                // Handle Amparo structured error format
-                if (responseData.error) {
-                    const errorObj = responseData.error;
+            <PasswordInput
+              label="Confirmar senha"
+              error={errors.confirm_password?.message}
+              register={register("confirm_password", {
+                validate: v =>
+                  v === getValues("password") || "As senhas não coincidem",
+              })}
+            />
 
-                    // 1. Map details to field errors
-                    if (errorObj.details) {
-                        Object.keys(errorObj.details).forEach((key) => {
-                            const fieldKey = key as keyof SignupForm;
-                            const fieldMessages = errorObj.details[fieldKey];
-                            const firstMessage = Array.isArray(fieldMessages) ? fieldMessages[0] : null;
 
-                            if (firstMessage && typeof firstMessage === 'string') {
-                                setError(fieldKey, {
-                                    type: "manual",
-                                    message: firstMessage
-                                });
-                            }
-                        });
-                    }
+            <Input label="Perfil" error={errors.role?.message}>
+              <Controller
+                name="role"
+                control={control}
+                render={({ field }) => (
+                  <select {...field} className={inputClass}>
+                    <option value="">Selecione o seu perfil</option>
+                    {ROLE_OPTIONS.map(r => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              />
+            </Input>
+          </>
+        )}
 
-                    // 2. Set global error message
-                    if (errorObj.message) {
-                        setGlobalError(errorObj.message);
-                        return;
-                    }
-                }
 
-                // Fallback for non-structured or missing message
-                if (typeof responseData === 'string') {
-                    setGlobalError(responseData);
-                } else if (typeof responseData === 'object') {
-                    // Avoid [object Object] and false values
-                    const messages = Object.entries(responseData)
-                        .filter(([key]) => key !== 'success')
-                        .map(([_, v]) => {
-                            if (typeof v === 'string') return v;
-                            if (Array.isArray(v) && typeof v[0] === 'string') return v[0];
-                            if (v && typeof v === 'object' && (v as any).message) return (v as any).message;
-                            return null;
-                        })
-                        .filter(Boolean);
+        {/* ======================================================
+            STEP 2
+        ====================================================== */}
 
-                    setGlobalError(messages.length > 0 ? messages.join(", ") : "Erro ao criar conta.");
-                } else {
-                    setGlobalError("Erro ao criar conta.");
-                }
-            } else {
-                setGlobalError("Ocorreu um erro ao entrar em contato com o servidor. Tente novamente.");
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
+        {step === 2 && (
+          <>
+            <Input label="Telefone" error={errors.phone?.message}>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    maxLength={15}
+                    onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                    placeholder="(11) 99999-9999"
+                    className={inputClass}
+                  />
+                )}
+              />
+            </Input>
 
-    return (
-        <div className="flex flex-1 items-center justify-center px-4 py-8">
-            <Card className="w-full max-w-md">
-                <CardHeader className="space-y-1 text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <HeartHandshake className="h-6 w-6" />
-                        </div>
-                    </div>
-                    <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
-                    <CardDescription>
-                        Junte-se ao Amparo para cuidar e conectar
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-                        <div className="space-y-2">
-                            <Label htmlFor="full_name">Nome Completo</Label>
-                            <Input id="full_name" {...register("full_name")} />
-                            {errors.full_name && <p className="text-xs text-destructive">{errors.full_name.message}</p>}
-                        </div>
+            <Input label="Endereço" error={errors.address_line?.message}>
+              <input {...register("address_line")} placeholder="Rua, número e complemento" className={inputClass} />
+            </Input>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" placeholder="nome@exemplo.com" {...register("email")} />
-                            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-                        </div>
+            <Input label="Cidade" error={errors.city?.message}>
+              <input {...register("city")} placeholder="Sua cidade" className={inputClass} />
+            </Input>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Telefone</Label>
-                                <Input id="phone" placeholder="(00) 00000-0000" {...register("phone")} />
-                                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="role">Perfil</Label>
-                                <Select
-                                    onValueChange={(val: "ELDER" | "CAREGIVER" | "FAMILY" | "PROFESSIONAL" | "INSTITUTION") => setValue("role", val)}
-                                    defaultValue={watch("role") || "ELDER"}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecione" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="ELDER">Idoso</SelectItem>
-                                        <SelectItem value="CAREGIVER">Cuidador</SelectItem>
-                                        <SelectItem value="FAMILY">Familiar</SelectItem>
-                                        <SelectItem value="PROFESSIONAL">Profissional</SelectItem>
-                                        <SelectItem value="INSTITUTION">Instituição</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
-                            </div>
-                        </div>
+            <Input label="Estado" error={errors.state?.message}>
+              <input {...register("state")} placeholder="UF" className={inputClass} maxLength={2} />
+            </Input>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Senha</Label>
-                            <Input id="password" type="password" {...register("password")} />
-                            {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-                        </div>
+            <Input label="CEP" error={errors.zip_code?.message}>
+              <Controller
+                name="zip_code"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    maxLength={9}
+                    onChange={(e) => field.onChange(maskCEP(e.target.value))}
+                    placeholder="00000-000"
+                    className={inputClass}
+                  />
+                )}
+              />
+            </Input>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                            <Input id="confirmPassword" type="password" {...register("confirmPassword")} />
-                            {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
-                        </div>
+            <button
+              type="button"
+              onClick={handlePrevStep}
+              className="text-sm text-text/70 hover:underline pt-2"
+            >
+              Voltar
+            </button>
+          </>
+        )}
 
-                        {globalError && (
-                            <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm font-medium">
-                                {globalError}
-                            </div>
-                        )}
+      </AuthForm>
+    </AuthLayout>
+  );
+}
 
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? "Criando conta..." : "Criar Conta"}
-                        </Button>
-                    </form>
-                </CardContent>
-                <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
-                    <div>
-                        Já tem uma conta?{" "}
-                        <Link to="/login" className="text-primary hover:underline font-medium">
-                            Entrar
-                        </Link>
-                    </div>
-                </CardFooter>
-            </Card>
-        </div>
-    );
-};
+
+// ======================================================
+// PASSWORD INPUT
+// ======================================================
+
+function PasswordInput({ label, error, register }: any) {
+
+  const [visible, setVisible] = useState(false);
+  const errorMessages =
+  error?.types ? Object.values(error.types) : error ? [error] : [];
+
+
+  return (
+    <div className="space-y-1">
+      <label className="text-sm font-medium text-text">{label}</label>
+
+      <div className="relative">
+        <input
+          type={visible ? "text" : "password"}
+          {...register}
+          className={`${inputClass} pr-12`}
+          placeholder="••••••••"
+        />
+
+        <button
+          type="button"
+          onClick={() => setVisible(v => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-text/60 hover:text-text"
+        >
+          {visible ? <EyeOff size={20}/> : <Eye size={20}/>}
+        </button>
+      </div>
+
+      {errorMessages.length > 0 && (
+        <ul className="text-sm text-red-500 space-y-1">
+          {errorMessages.map((msg: string, i: number) => (
+            <li key={i}>• {msg}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+
+// ======================================================
+// INPUT COMPONENT
+// ======================================================
+
+const inputClass = `
+w-full h-12 px-4 rounded-xl border border-border
+focus:ring-2 focus:ring-primary/40 focus:border-primary
+`;
+
+function Input({ label, error, children }: any) {
+  return (
+    <div className="space-y-1">
+      <label className="text-sm font-medium text-text">{label}</label>
+      {children}
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}

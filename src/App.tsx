@@ -1,15 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import { LandingPage } from "@/pages/LandingPage";
-import { SignupPage } from "@/pages/auth/SignupPage";
 import { FeedPage } from "@/pages/feed/FeedPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
 import { LinksPage } from "@/pages/links/LinksPage";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { BaseLayout } from "@/components/layout/BaseLayout";
-import { PublicLayout } from "@/components/layout/PublicLayout";
+import { LandingLayout } from "./components/layout/LandingLayout";
+import LandingPage from "./pages/LandingPage";
+import SignupPage from "./pages/auth/SignupPage";
 import LoginPage from "./pages/auth/LoginPage";
-import Signup from "./pages/auth/SignUp";
+import SignupSuccessPage from "./pages/auth/SignupSuccess";
+import { VerifiedRoute } from "./routes/VerifiedRoute";
+import { UnverifiedOnlyRoute } from "./routes/UnverifiedOnlyRoute";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,22 +27,31 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          {/* Public Routes */}
-
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route element={<PublicLayout />}>
+          {/* Rotas Públicas */}
+          <Route element={<LandingLayout />}>
             <Route path="/" element={<LandingPage />} />
-            
-            <Route path="/register" element={<SignupPage />} />
           </Route>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} /> 
 
-          {/* Protected Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<BaseLayout />}>
-              <Route path="/feed" element={<FeedPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/links" element={<LinksPage />} />
+          {/* Portão 1: Apenas Logados */}
+          <Route element={<ProtectedRoute/>}>
+
+            {/* SUB-PORTÃO: APENAS QUEM NÃO VERIFICOU (Bloqueia quem já é verificado) */}
+            <Route element={<UnverifiedOnlyRoute/>}>
+              <Route path="/signup-success" element={<SignupSuccessPage />} />      
+
+            </Route>            
+          
+
+          
+            {/* Portão 2: Apenas Logados e verificados */}
+            <Route element={<VerifiedRoute />}>
+              <Route element={<BaseLayout />}>
+                <Route path="/feed" element={<FeedPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/links" element={<LinksPage />} />
+              </Route>
             </Route>
           </Route>
 
