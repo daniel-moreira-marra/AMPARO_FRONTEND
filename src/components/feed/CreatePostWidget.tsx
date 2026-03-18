@@ -2,89 +2,125 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ImagePlus, Loader2, Send } from "lucide-react";
+import { ImagePlus, Loader2, SendIcon, Tag, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { useCreatePost } from "@/hooks/useFeed";
 import { useAuthStore } from "@/store/useAuthStore";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const createPostSchema = z.object({
-    content: z.string().min(1, "O post não pode estar vazio"),
+  content: z.string().min(1, "O post não pode estar vazio"),
 });
 
 export const CreatePostWidget = () => {
-    const { mutate: createPost, isPending } = useCreatePost();
-    const user = useAuthStore((state) => state.user);
-    const displayName = user?.full_name?.trim() || "Usuário";
-    const firstName = displayName.split(" ")[0] || "Usuário";
-    const avatarInitial = firstName.charAt(0).toUpperCase();
-    const { register, handleSubmit, reset } = useForm<{ content: string }>({
-        resolver: zodResolver(createPostSchema),
+  const { mutate: createPost, isPending } = useCreatePost();
+  const user = useAuthStore((state) => state.user);
+  const firstName = user?.full_name?.split(" ")[0] || "Usuário";
+
+  const { register, handleSubmit, reset, watch } = useForm<{ content: string }>({
+    resolver: zodResolver(createPostSchema),
+  });
+
+  const contentValue = watch("content");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+
+  const onSubmit = (data: { content: string }) => {
+    createPost({ content: data.content, image: selectedImage }, {
+      onSuccess: () => {
+        reset();
+        setSelectedImage(null);
+      }
     });
+  };
 
-    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  return (
+    <div className="bg-white rounded-[24px] border border-border/50 shadow-sm p-4">
+      <div className="flex gap-3">
+        {/* Avatar menor para economizar espaço */}
+        <Avatar className="h-10 w-10 rounded-full flex-shrink-0">
+          <AvatarImage src={user?.avatar} />
+          <AvatarFallback className="bg-primary-light text-primary font-bold text-xs">
+            {firstName.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
 
-    const onSubmit = (data: { content: string }) => {
-        createPost({ content: data.content, image: selectedImage }, {
-            onSuccess: () => {
-                reset();
-                setSelectedImage(null);
-            }
-        });
-    };
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1">
+          {/* Campo de Texto Compacto */}
+          <div className="bg-[#F9FAFB] rounded-2xl border border-gray-100/50 px-4 transition-all focus-within:bg-white focus-within:border-primary/20">
+            <textarea
+              className="w-full min-h-[44px] bg-transparent border-none focus:ring-0 text-[14px] text-text/80 placeholder:text-text/40 resize-none py-3 font-medium"
+              placeholder={`O que você quer falar hoje, ${firstName}?`}
+              rows={1}
+              {...register("content")}
+            />
+            
+            {selectedImage && (
+              <div className="relative pb-3 w-fit group">
+                <img 
+                  src={URL.createObjectURL(selectedImage)} 
+                  alt="Preview" 
+                  className="max-h-24 rounded-lg object-cover border border-border/20" 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full hover:bg-black/70"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            )}
+          </div>
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            setSelectedImage(e.target.files[0]);
-        }
-    };
+          {/* Rodapé: Ações Discretas */}
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-1">
+              {/* Foto: Cinza por padrão, Verde no Hover */}
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-text/40 hover:text-blue hover:bg-blue/5 cursor-pointer transition-all group">
+                <ImagePlus size={18} strokeWidth={1.5} />
+                <span className="text-xs font-bold">Foto</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => setSelectedImage(e.target.files?.[0] || null)} 
+                />
+              </label>
 
-    return (
-        <Card>
-            <CardContent className="p-4 space-y-4">
-                <div className="flex gap-4">
-                    <Avatar>
-                        <AvatarFallback>{avatarInitial}</AvatarFallback>
-                    </Avatar>
-                    <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-4">
-                        <div className="relative">
-                            <textarea
-                                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y"
-                                placeholder={`O que você está pensando, ${firstName}?`}
-                                {...register("content")}
-                            />
-                        </div>
+              {/* Tag: Cinza por padrão, Azul no Hover */}
+              <button 
+                type="button" 
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-text/40 hover:text-blue hover:bg-blue/5 transition-all group"
+              >
+                <Tag size={18} strokeWidth={1.5} />
+                <span className="text-xs font-bold">Tag</span>
+              </button>
+            </div>
 
-                        {selectedImage && (
-                            <div className="relative rounded-md overflow-hidden bg-muted w-fit max-w-[200px]">
-                                <img src={URL.createObjectURL(selectedImage)} alt="Preview" className="object-cover max-h-32" />
-                                <button
-                                    type="button"
-                                    onClick={() => setSelectedImage(null)}
-                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 text-xs hover:bg-black/70"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="flex items-center justify-between pt-2">
-                            <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                                <ImagePlus className="h-5 w-5" />
-                                <span>Adicionar foto</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                            </label>
-
-                            <Button type="submit" disabled={isPending} size="sm">
-                                {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                                Publicar
-                            </Button>
-                        </div>
-                    </form>
-                </div>
-            </CardContent>
-        </Card>
-    )
-}
+            {/* Botão Publicar Minimalista */}
+            <button
+                type="submit"
+                disabled={isPending || !contentValue?.trim()}
+                className={`
+                    flex items-center gap-2 px-5 py-2 rounded-full font-bold text-xs transition-all
+                    ${!contentValue?.trim() || isPending
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-blue text-white hover:bg-blue/90 active:scale-95 shadow-md shadow-blue/10"}
+                `}
+                >
+                {isPending ? (
+                    <Loader2 size={14} className="animate-spin mr-1" />
+                ) : (
+                    <>
+                    {/* Ícone ANTES do texto */}
+                    <SendIcon size={15} strokeWidth={2.5} className={!contentValue?.trim() ? "text-gray-400" : "text-white"} />
+                    <span>Publicar</span>
+                    </>
+                )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

@@ -12,6 +12,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import SignupSuccessPage from "./pages/auth/SignupSuccess";
 import { VerifiedRoute } from "./routes/VerifiedRoute";
 import { UnverifiedOnlyRoute } from "./routes/UnverifiedOnlyRoute";
+import { FeedLayout } from "./components/layout/feed/FeedLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,14 @@ function App() {
             {/* Portão 2: Apenas Logados e verificados */}
             <Route element={<VerifiedRoute />}>
               <Route element={<BaseLayout />}>
+                <Route 
+                    path="/feed" 
+                    element={
+                      <FeedLayout>
+                        <FeedPage />
+                      </FeedLayout>
+                    } 
+                  />
                 <Route path="/feed" element={<FeedPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/links" element={<LinksPage />} />

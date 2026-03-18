@@ -1,14 +1,14 @@
 import { Outlet } from "react-router-dom";
-import { Navbar } from "@/components/layout/Navbar";
+import { Navbar } from "./Navbar";
 
 export const BaseLayout = () => {
-    return (
-        <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-            <Navbar />
-
-            <main className="flex-1 container max-w-5xl mx-auto py-6 md:py-8 px-4 md:px-6">
-                <Outlet />
-            </main>
-        </div>
-    );
+  return (
+    <div className="min-h-screen bg-[#F3F4F6] font-sans">
+      <Navbar />
+      {/* O pt-16 garante que o conteúdo não fique sob a Navbar fixa */}
+      <main className="pt-16">
+        <Outlet />
+      </main>
+    </div>
+  );
 };

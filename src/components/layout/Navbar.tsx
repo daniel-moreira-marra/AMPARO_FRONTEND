@@ -1,63 +1,82 @@
-import { Link, useNavigate } from "react-router-dom";
-import { HeartHandshake, Home, Link as LinkIcon, LogOut, User } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Bell, User as UserIcon, Home, Link as LinkIcon } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { Button } from "@/components/ui/button";
 
 export const Navbar = () => {
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-    const logout = useAuthStore((state) => state.logout);
-    const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const location = useLocation();
 
-    const handleLogout = () => {
-        logout();
-        navigate("/");
-    };
+  const isActive = (path: string) => location.pathname === path;
 
-    return (
-        <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-            <div className="container flex h-14 items-center justify-between px-4 md:px-6 max-w-5xl mx-auto">
-                <div className="flex items-center gap-2">
-                    <Link to={isAuthenticated ? "/feed" : "/"} className="flex items-center gap-2 font-semibold text-primary text-lg">
-                        <HeartHandshake className="h-6 w-6 text-indigo-600" />
-                        <span>Amparo</span>
-                    </Link>
+  return (
+    <nav className="fixed top-0 w-full h-16 bg-white/80 backdrop-blur-md border-b border-border z-50">
+      <div className="max-w-7xl mx-auto h-full px-4 flex items-center justify-between gap-4">
+        
+        {/* Logo */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Link to={isAuthenticated ? "/feed" : "/"} className="flex items-center gap-2">
+            <img src="/images/logo-amparo.svg" alt="Amparo" className="h-8 w-auto" />
+          </Link>
+        </div>
+
+        {/* Menu Central */}
+        {isAuthenticated && (
+          <nav className="hidden md:flex flex-1 justify-center items-center gap-2">
+            <NavLink to="/feed" icon={<Home size={18} />} label="Feed" active={isActive("/feed")} />
+            <NavLink to="/links" icon={<LinkIcon size={18} />} label="Vínculos" active={isActive("/links")} />
+            <NavLink to="/profile" icon={<UserIcon size={18} />} label="Perfil" active={isActive("/profile")} />
+          </nav>
+        )}
+
+        {/* Ações */}
+        <div className="flex items-center gap-2 md:gap-4">
+          {isAuthenticated ? (
+            <>
+              {/* Notificações */}
+              <button className="p-2 text-text/60 hover:bg-primary-light hover:text-primary rounded-full transition-colors relative">
+                <Bell size={22} />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+              </button>
+              
+              <div className="h-8 w-[1px] bg-border hidden sm:block"></div>
+
+              {/* User Profile Mini */}
+              <button className="flex items-center gap-2 p-1 hover:bg-gray-100 rounded-full transition-colors group">
+                <div className="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center text-primary border border-primary/20 overflow-hidden text-xs font-bold transition-transform group-hover:scale-105">
+                  {user?.full_name?.charAt(0) || <UserIcon size={16} />}
                 </div>
-
-                {isAuthenticated ? (
-                    <>
-                        <nav className="flex items-center gap-4 md:gap-6">
-                            <Link to="/feed" className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1">
-                                <Home className="h-4 w-4" />
-                                <span className="hidden md:inline">Feed</span>
-                            </Link>
-                            <Link to="/links" className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1">
-                                <LinkIcon className="h-4 w-4" />
-                                <span className="hidden md:inline">Vínculos</span>
-                            </Link>
-                            <Link to="/profile" className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1">
-                                <User className="h-4 w-4" />
-                                <span className="hidden md:inline">Perfil</span>
-                            </Link>
-                        </nav>
-
-                        <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
-                                <LogOut className="h-4 w-4" />
-                                <span className="sr-only">Sair</span>
-                            </Button>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex items-center gap-4">
-                        <Link to="/login">
-                            <Button variant="ghost">Entrar</Button>
-                        </Link>
-                        <Link to="/signup">
-                            <Button>Criar Conta</Button>
-                        </Link>
-                    </div>
-                )}
+                <span className="hidden sm:block text-sm font-semibold text-text truncate max-w-[100px]">
+                  {user?.full_name?.split(" ")[0]}
+                </span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-4">
+              <Link to="/login" className="text-sm font-medium text-text/70 hover:text-text transition-colors">
+                Entrar
+              </Link>
+              <Link to="/signup" className="text-sm font-bold text-white bg-primary px-5 py-2.5 rounded-full hover:bg-primary/90 shadow-md shadow-primary/20 transition-all">
+                Criar Conta
+              </Link>
             </div>
-        </header>
-    );
+          )}
+        </div>
+      </div>
+    </nav>
+  );
 };
+
+const NavLink = ({ to, icon, label, active }: { to: string; icon: React.ReactNode; label: string; active: boolean }) => (
+  <Link
+    to={to}
+    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+      active
+        ? "bg-primary-light text-primary shadow-sm shadow-primary/5"
+        : "text-text/60 hover:bg-gray-50 hover:text-text"
+    }`}
+  >
+    {icon}
+    {label}
+  </Link>
+);
