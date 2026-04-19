@@ -3,99 +3,53 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import type { UseFormRegisterReturn } from "react-hook-form";
 
 import AuthLayout from "@/components/auth/AuthLayout";
 import AuthHero from "@/components/auth/AuthHero";
 import AuthForm from "@/components/auth/AuthForm";
-
 import { api } from "@/api/axios";
-import { maskPhone, maskCEP } from "@/utils/masks";
-import { Eye, EyeOff } from "lucide-react";
+import { maskPhone, maskCEP, CEP_REGEX } from "@/utils/masks";
+import { resolveApiError } from "@/utils/apiError";
+import { ROLE_OPTIONS } from "@/constants/roles";
 
+const inputClass =
+  "w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary";
 
-// ======================================================
-// ROLES
-// ======================================================
-
-const ROLE_OPTIONS = [
-  { value: "ELDER", label: "Idoso" },
-  { value: "CAREGIVER", label: "Cuidador" },
-  { value: "FAMILY", label: "Familiar" },
-  { value: "PROFESSIONAL", label: "Profissional" },
-  { value: "INSTITUTION", label: "Instituição" },
-] as const;
-
-
-// ======================================================
-// VALIDATION
-// ======================================================
-
-const signupSchema = z.object({
-
-  // STEP 1
-  full_name: z.string().min(2, "Informe seu nome completo"),
-  email: z.string().email("Email inválido"),
-  password: z
-  .string()
-  .min(6, "A senha deve ter pelo menos 6 caracteres")
-  .superRefine((value, ctx) => {
-
-    if (!/[A-Z]/.test(value)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Deve conter pelo menos 1 letra maiúscula",
-      });
-    }
-
-    if (!/[a-z]/.test(value)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Deve conter pelo menos 1 letra minúscula",
-      });
-    }
-
-    if (!/[0-9]/.test(value)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Deve conter pelo menos 1 número",
-      });
-    }
-
-    if (!/[^A-Za-z0-9]/.test(value)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Deve conter pelo menos 1 caractere especial",
-      });
-    }
-
-  }),
-  confirm_password: z.string(),
-  role: z.string().min(1, "Selecione o seu perfil"),
-
-  // STEP 2
-  phone: z.string().min(14, "Telefone inválido"),
-  address_line: z.string().min(3, "Informe o endereço"),
-  city: z.string().min(2, "Informe a cidade"),
-  state: z.string().min(2, "Informe o estado"),
-  zip_code: z.string().min(9, "CEP inválido"),
-
-}).refine(
-  (data) => data.password === data.confirm_password,
-  {
+const signupSchema = z
+  .object({
+    full_name: z.string().min(2, "Informe seu nome completo"),
+    email: z.string().email("Email inválido"),
+    password: z
+      .string()
+      .min(6, "A senha deve ter pelo menos 6 caracteres")
+      .superRefine((value, ctx) => {
+        if (!/[A-Z]/.test(value))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Deve conter pelo menos 1 letra maiúscula" });
+        if (!/[a-z]/.test(value))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Deve conter pelo menos 1 letra minúscula" });
+        if (!/[0-9]/.test(value))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Deve conter pelo menos 1 número" });
+        if (!/[^A-Za-z0-9]/.test(value))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Deve conter pelo menos 1 caractere especial" });
+      }),
+    confirm_password: z.string(),
+    role: z.string().min(1, "Selecione o seu perfil"),
+    phone: z.string().min(14, "Telefone inválido"),
+    address_line: z.string().min(3, "Informe o endereço"),
+    city: z.string().min(2, "Informe a cidade"),
+    state: z.string().min(2, "Informe o estado"),
+    zip_code: z.string().regex(CEP_REGEX, "CEP inválido (formato: 00000-000)"),
+  })
+  .refine((data) => data.password === data.confirm_password, {
     path: ["confirm_password"],
     message: "As senhas não coincidem",
-  }
-);
+  });
 
 type SignupForm = z.infer<typeof signupSchema>;
 
-
-// ======================================================
-// PAGE
-// ======================================================
-
 export default function SignupPage() {
-
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -105,66 +59,21 @@ export default function SignupPage() {
     handleSubmit,
     control,
     trigger,
-    getValues,
-    setError,
     formState: { errors, isSubmitting },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
     criteriaMode: "all",
-    defaultValues: {
-      role: "",
-      phone: "",
-      zip_code: "",
-    },
+    defaultValues: { role: "", phone: "", zip_code: "" },
   });
 
-
-  // ======================================================
-  // STEP CONTROL
-  // ======================================================
-
   async function handleNextStep() {
-
-    const step1Fields = [
-      "full_name",
-      "email",
-      "password",
-      "confirm_password",
-      "role",
-    ] as const;
-
-    const valid = await trigger(step1Fields);
-    if (!valid) return;
-
-    // ✅ validação manual das senhas
-    const password = getValues("password");
-    const confirm = getValues("confirm_password");
-
-    if (password !== confirm) {
-      setError("confirm_password", {
-        type: "manual",
-        message: "As senhas não coincidem",
-      });
-      return;
-    }
-
-    setStep(2);
+    const valid = await trigger(["full_name", "email", "password", "confirm_password", "role"]);
+    if (valid) setStep(2);
   }
-
-  function handlePrevStep() {
-    setStep(1);
-  }
-
-
-  // ======================================================
-  // SUBMIT
-  // ======================================================
 
   const onSubmit = async (data: SignupForm) => {
     setServerError(null);
-
     try {
-
       await api.post("/auth/signup/", {
         email: data.email,
         password: data.password,
@@ -176,32 +85,11 @@ export default function SignupPage() {
         state: data.state,
         zip_code: data.zip_code,
       });
-
-      navigate("/signup-success", {
-        replace: true,
-        state: { message: "Conta criada com sucesso" },
-      });
-
-    } catch (err: any) {
-
-      if (err.response?.status === 400) {
-        setServerError("Dados inválidos. Revise as informações.");
-        return;
-      }
-
-      if (err.response) {
-        setServerError("Ocorreu um erro. Tente novamente mais tarde.");
-        return;
-      }
-
-      setServerError("Falha de conexão. Verifique sua internet.");
+      navigate("/signup-success", { replace: true, state: { message: "Conta criada com sucesso" } });
+    } catch (err) {
+      setServerError(resolveApiError(err, "Não foi possível criar a conta. Tente novamente."));
     }
   };
-
-
-  // ======================================================
-  // UI
-  // ======================================================
 
   return (
     <AuthLayout
@@ -219,7 +107,11 @@ export default function SignupPage() {
         title="Criar conta"
         description={`Etapa ${step} de 2`}
         submitLabel={step === 1 ? "Continuar" : "Criar conta"}
-        onSubmit={step === 1 ? (e) => { e.preventDefault(); handleNextStep(); } : handleSubmit(onSubmit)}
+        onSubmit={
+          step === 1
+            ? (e) => { e.preventDefault(); handleNextStep(); }
+            : handleSubmit(onSubmit)
+        }
         error={serverError}
         isLoading={isSubmitting}
         footer={
@@ -231,20 +123,15 @@ export default function SignupPage() {
           </p>
         }
       >
-
-        {/* ======================================================
-            STEP 1
-        ====================================================== */}
-
         {step === 1 && (
           <>
-            <Input label="Nome completo" error={errors.full_name?.message}>
+            <FieldWrapper label="Nome completo" error={errors.full_name?.message}>
               <input {...register("full_name")} placeholder="Seu nome completo" className={inputClass} />
-            </Input>
+            </FieldWrapper>
 
-            <Input label="Email" error={errors.email?.message}>
+            <FieldWrapper label="Email" error={errors.email?.message}>
               <input type="email" {...register("email")} placeholder="seu@email.com" className={inputClass} />
-            </Input>
+            </FieldWrapper>
 
             <PasswordInput
               label="Senha"
@@ -255,21 +142,17 @@ export default function SignupPage() {
             <PasswordInput
               label="Confirmar senha"
               error={errors.confirm_password?.message}
-              register={register("confirm_password", {
-                validate: v =>
-                  v === getValues("password") || "As senhas não coincidem",
-              })}
+              register={register("confirm_password")}
             />
 
-
-            <Input label="Perfil" error={errors.role?.message}>
+            <FieldWrapper label="Perfil" error={errors.role?.message}>
               <Controller
                 name="role"
                 control={control}
                 render={({ field }) => (
                   <select {...field} className={inputClass}>
                     <option value="">Selecione o seu perfil</option>
-                    {ROLE_OPTIONS.map(r => (
+                    {ROLE_OPTIONS.map((r) => (
                       <option key={r.value} value={r.value}>
                         {r.label}
                       </option>
@@ -277,18 +160,13 @@ export default function SignupPage() {
                   </select>
                 )}
               />
-            </Input>
+            </FieldWrapper>
           </>
         )}
 
-
-        {/* ======================================================
-            STEP 2
-        ====================================================== */}
-
         {step === 2 && (
           <>
-            <Input label="Telefone" error={errors.phone?.message}>
+            <FieldWrapper label="Telefone" error={errors.phone?.message}>
               <Controller
                 name="phone"
                 control={control}
@@ -302,21 +180,21 @@ export default function SignupPage() {
                   />
                 )}
               />
-            </Input>
+            </FieldWrapper>
 
-            <Input label="Endereço" error={errors.address_line?.message}>
+            <FieldWrapper label="Endereço" error={errors.address_line?.message}>
               <input {...register("address_line")} placeholder="Rua, número e complemento" className={inputClass} />
-            </Input>
+            </FieldWrapper>
 
-            <Input label="Cidade" error={errors.city?.message}>
+            <FieldWrapper label="Cidade" error={errors.city?.message}>
               <input {...register("city")} placeholder="Sua cidade" className={inputClass} />
-            </Input>
+            </FieldWrapper>
 
-            <Input label="Estado" error={errors.state?.message}>
+            <FieldWrapper label="Estado" error={errors.state?.message}>
               <input {...register("state")} placeholder="UF" className={inputClass} maxLength={2} />
-            </Input>
+            </FieldWrapper>
 
-            <Input label="CEP" error={errors.zip_code?.message}>
+            <FieldWrapper label="CEP" error={errors.zip_code?.message}>
               <Controller
                 name="zip_code"
                 control={control}
@@ -330,39 +208,35 @@ export default function SignupPage() {
                   />
                 )}
               />
-            </Input>
+            </FieldWrapper>
 
             <button
               type="button"
-              onClick={handlePrevStep}
+              onClick={() => setStep(1)}
               className="text-sm text-text/70 hover:underline pt-2"
             >
               Voltar
             </button>
           </>
         )}
-
       </AuthForm>
     </AuthLayout>
   );
 }
 
+interface PasswordInputProps {
+  label: string;
+  error?: string;
+  register: UseFormRegisterReturn;
+}
 
-// ======================================================
-// PASSWORD INPUT
-// ======================================================
-
-function PasswordInput({ label, error, register }: any) {
-
+function PasswordInput({ label, error, register }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
-  const errorMessages =
-  error?.types ? Object.values(error.types) : error ? [error] : [];
-
+  const errorMessages = error ? [error] : [];
 
   return (
     <div className="space-y-1">
       <label className="text-sm font-medium text-text">{label}</label>
-
       <div className="relative">
         <input
           type={visible ? "text" : "password"}
@@ -370,19 +244,18 @@ function PasswordInput({ label, error, register }: any) {
           className={`${inputClass} pr-12`}
           placeholder="••••••••"
         />
-
         <button
           type="button"
-          onClick={() => setVisible(v => !v)}
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-text/60 hover:text-text"
         >
-          {visible ? <EyeOff size={20}/> : <Eye size={20}/>}
+          {visible ? <EyeOff size={20} /> : <Eye size={20} />}
         </button>
       </div>
-
       {errorMessages.length > 0 && (
         <ul className="text-sm text-red-500 space-y-1">
-          {errorMessages.map((msg: string, i: number) => (
+          {errorMessages.map((msg, i) => (
             <li key={i}>• {msg}</li>
           ))}
         </ul>
@@ -391,17 +264,13 @@ function PasswordInput({ label, error, register }: any) {
   );
 }
 
+interface FieldWrapperProps {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}
 
-// ======================================================
-// INPUT COMPONENT
-// ======================================================
-
-const inputClass = `
-w-full h-12 px-4 rounded-xl border border-border
-focus:ring-2 focus:ring-primary/40 focus:border-primary
-`;
-
-function Input({ label, error, children }: any) {
+function FieldWrapper({ label, error, children }: FieldWrapperProps) {
   return (
     <div className="space-y-1">
       <label className="text-sm font-medium text-text">{label}</label>

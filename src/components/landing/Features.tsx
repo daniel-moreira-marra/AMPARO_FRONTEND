@@ -1,4 +1,5 @@
 import { ShieldCheck, Users, HeartPulse } from "lucide-react";
+import { StarRating } from "@/components/ui/StarRating";
 
 const features = [
   {
@@ -15,7 +16,7 @@ const features = [
     title: "Acesso a Profissionais",
     desc: "Encontre e se conecte com médicos, enfermeiros e cuidadores qualificados.",
     icon: <HeartPulse size={32} />,
-  }
+  },
 ];
 
 export default function Features() {
@@ -28,8 +29,8 @@ export default function Features() {
 
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((item, idx) => (
-            <div 
-              key={idx} 
+            <div
+              key={idx}
               className="bg-white p-8 rounded-[2.5rem] shadow-sm hover:shadow-xl transition-shadow border border-white flex flex-col items-center text-center group"
             >
               <div className="w-20 h-20 bg-primary/10 text-primary rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -37,12 +38,7 @@ export default function Features() {
               </div>
               <h3 className="text-xl font-bold text-text mb-4">{item.title}</h3>
               <p className="text-text/60 text-sm leading-relaxed mb-6">{item.desc}</p>
-              
-              <div className="flex gap-1 text-warm">
-                {[...Array(5)].map((_, i) => (
-                  <span key={i} className="text-lg">★</span>
-                ))}
-              </div>
+              <StarRating />
             </div>
           ))}
         </div>

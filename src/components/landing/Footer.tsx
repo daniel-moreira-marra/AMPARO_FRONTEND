@@ -1,4 +1,4 @@
-import { Instagram, Facebook, Clock } from "lucide-react";
+import { Instagram, Facebook, Youtube } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -6,8 +6,8 @@ export default function Footer() {
       <div className="container mx-auto px-6">
         <div className="flex flex-col md:flex-row justify-between items-center gap-10 mb-16">
           <img src="/images/logo-amparo.svg" alt="Amparo" className="h-12" />
-          
-          <nav className="flex gap-8 text-text/60 font-medium">
+
+          <nav className="flex gap-8 text-text/60 font-medium" aria-label="Links do rodapé">
             <a href="#" className="hover:text-primary transition-colors">Home</a>
             <a href="#" className="hover:text-primary transition-colors">Como Funciona</a>
             <a href="#" className="hover:text-primary transition-colors">Sobre Nós</a>
@@ -15,15 +15,27 @@ export default function Footer() {
           </nav>
 
           <div className="flex gap-4">
-            <div className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer">
+            <a
+              href="#"
+              aria-label="Facebook do Amparo"
+              className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+            >
               <Facebook size={20} />
-            </div>
-            <div className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer">
+            </a>
+            <a
+              href="#"
+              aria-label="Instagram do Amparo"
+              className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+            >
               <Instagram size={20} />
-            </div>
-            <div className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer">
-              <Clock size={20} />
-            </div>
+            </a>
+            <a
+              href="#"
+              aria-label="YouTube do Amparo"
+              className="p-2 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors"
+            >
+              <Youtube size={20} />
+            </a>
           </div>
         </div>
 
