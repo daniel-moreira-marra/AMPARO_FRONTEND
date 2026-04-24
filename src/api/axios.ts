@@ -1,10 +1,14 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface AmparoRequestConfig extends InternalAxiosRequestConfig {
   _skipAuth?: boolean;
+  _suppressGlobalLogout?: boolean;
 }
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Em dev, usa o proxy do Vite (/api → http://localhost:8000) para evitar CORS.
+// Em produção, defina VITE_API_BASE_URL com a URL completa do backend.
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export const api = axios.create({
   baseURL,
@@ -15,11 +19,9 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config: AmparoRequestConfig) => {
-    if (config._skipAuth || config.url?.endsWith('/auth/token/')) {
-      return config;
-    }
+    if (config._skipAuth) return config;
 
-    const token = localStorage.getItem('access_token');
+    const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -31,10 +33,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Dispatches a global event so the auth store can react (logout) without
-      // creating a circular dependency between axios and the store.
-      // TODO: implement silent token refresh here before dispatching the event.
+    const config = error.config as AmparoRequestConfig | undefined;
+    if (error.response?.status === 401 && !config?._suppressGlobalLogout) {
       window.dispatchEvent(new Event('amparo:unauthorized'));
     }
     return Promise.reject(error);

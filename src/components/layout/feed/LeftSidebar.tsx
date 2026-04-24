@@ -13,9 +13,17 @@ export const LeftSidebar = () => {
         <div className="h-16 bg-gradient-to-br from-primary/80 to-blue/80" />
         <div className="px-4 pb-5 -mt-8 flex flex-col items-center">
           <div className="w-16 h-16 rounded-2xl bg-white p-1 shadow-md">
-            <div className="w-full h-full rounded-xl bg-primary-light flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
-              {user?.full_name?.charAt(0) ?? "U"}
-            </div>
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.full_name ?? ""}
+                className="w-full h-full rounded-xl object-cover"
+              />
+            ) : (
+              <div className="w-full h-full rounded-xl bg-primary-light flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
+                {user?.full_name?.charAt(0) ?? "U"}
+              </div>
+            )}
           </div>
           <div className="mt-3 text-center">
             <h3 className="font-bold text-text leading-tight">{user?.full_name}</h3>

@@ -4,10 +4,13 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 
 import { FeedPage } from "@/pages/feed/FeedPage";
 import { ProfilePage } from "@/pages/profile/ProfilePage";
+import { PublicProfilePage } from "@/pages/profile/PublicProfilePage";
 import { LinksPage } from "@/pages/links/LinksPage";
+import { SearchPage } from "@/pages/search/SearchPage";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { VerifiedRoute } from "@/routes/VerifiedRoute";
 import { UnverifiedOnlyRoute } from "@/routes/UnverifiedOnlyRoute";
+import { PublicOnlyRoute } from "@/routes/PublicOnlyRoute";
 import { BaseLayout } from "@/components/layout/BaseLayout";
 import { LandingLayout } from "@/components/layout/LandingLayout";
 import { FeedLayout } from "@/components/layout/feed/FeedLayout";
@@ -42,8 +45,10 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
       </Route>
 
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+      </Route>
 
       <Route element={<ProtectedRoute />}>
         <Route element={<UnverifiedOnlyRoute />}>
@@ -61,7 +66,9 @@ function AppRoutes() {
               }
             />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/:userId" element={<PublicProfilePage />} />
             <Route path="/links" element={<LinksPage />} />
+            <Route path="/search" element={<SearchPage />} />
           </Route>
         </Route>
       </Route>

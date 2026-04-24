@@ -1,7 +1,7 @@
 export const ROLE_LABELS: Record<string, string> = {
   ELDER: 'Idoso',
   CAREGIVER: 'Cuidador',
-  FAMILY: 'Familiar',
+  GUARDIAN: 'Responsável',
   PROFESSIONAL: 'Profissional de Saúde',
   INSTITUTION: 'Instituição',
 };

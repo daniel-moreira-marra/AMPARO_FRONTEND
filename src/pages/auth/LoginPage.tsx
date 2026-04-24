@@ -10,7 +10,7 @@ import AuthForm from "@/components/auth/AuthForm";
 import { useAuthStore } from "@/store/useAuthStore";
 import { api } from "@/api/axios";
 import { resolveApiError } from "@/utils/apiError";
-import type { User, AuthResponse } from "@/types";
+import type { User, AuthResponse, ApiResponse } from "@/types";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -38,16 +38,16 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setServerError(null);
     try {
-      const response = await api.post<AuthResponse>("/auth/token/", data);
-      const { access, refresh } = response.data.data;
+      const tokenRes = await api.post<ApiResponse<AuthResponse>>("/auth/token/", data);
+      const { access, refresh } = tokenRes.data.data;
 
-      const meResponse = await api.get("/auth/me/", {
+      const meRes = await api.get<ApiResponse<User>>("/auth/me/", {
         headers: { Authorization: `Bearer ${access}` },
       });
+      const user: User = meRes.data.data;
 
-      const user: User = meResponse.data.data;
       setAuth(access, refresh, user);
-      navigate(from, { replace: true });
+      navigate(user.is_verified ? from : "/signup-success", { replace: true });
     } catch (err) {
       setServerError(resolveApiError(err, "Não foi possível fazer login. Tente novamente."));
     }

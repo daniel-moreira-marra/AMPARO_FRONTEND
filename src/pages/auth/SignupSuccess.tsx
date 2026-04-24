@@ -4,6 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import { api } from "@/api/axios";
 import { resolveApiError } from "@/utils/apiError";
+import type { User, ApiResponse } from "@/types";
+import type { InternalAxiosRequestConfig } from "axios";
+
+interface SuppressConfig extends InternalAxiosRequestConfig {
+  _suppressGlobalLogout?: boolean;
+}
 
 export default function SignupSuccessPage() {
   const [isChecking, setIsChecking] = useState(false);
@@ -22,7 +28,7 @@ export default function SignupSuccessPage() {
   const handleCheckVerification = async () => {
     if (!accessToken || !refreshToken) {
       showFeedback("Sessão inválida. Por favor, faça login novamente.", 'error');
-      logout();
+      setTimeout(() => { logout(); navigate("/login", { replace: true }); }, 1500);
       return;
     }
 
@@ -30,11 +36,12 @@ export default function SignupSuccessPage() {
     setFeedbackMessage(null);
 
     try {
-      const response = await api.get("/auth/me/", {
+      const response = await api.get<ApiResponse<User>>("/auth/me/", {
         headers: { Authorization: `Bearer ${accessToken}` },
-      });
+        _suppressGlobalLogout: true,
+      } as SuppressConfig);
 
-      const userData = response.data.data ?? response.data;
+      const userData: User = response.data.data;
 
       if (userData.is_verified) {
         setAuth(accessToken, refreshToken, userData);
@@ -43,9 +50,12 @@ export default function SignupSuccessPage() {
         showFeedback("E-mail ainda não verificado. Verifique sua caixa de entrada.", 'info');
       }
     } catch (err) {
-      showFeedback(resolveApiError(err, "Erro ao verificar a conta."), 'error');
-      if ((err as { response?: { status?: number } }).response?.status === 401) {
-        logout();
+      const status = (err as { response?: { status?: number } }).response?.status;
+      if (status === 401) {
+        showFeedback("Sessão expirada. Faça login novamente.", 'error');
+        setTimeout(() => { logout(); navigate("/login", { replace: true }); }, 1500);
+      } else {
+        showFeedback(resolveApiError(err, "Erro ao verificar a conta."), 'error');
       }
     } finally {
       setIsChecking(false);
@@ -109,7 +119,7 @@ export default function SignupSuccessPage() {
           </button>
 
           <button
-            onClick={() => logout()}
+            onClick={() => { logout(); navigate("/login", { replace: true }); }}
             className="w-full h-12 flex items-center justify-center gap-2 bg-transparent text-text/60 rounded-xl font-medium hover:bg-black/5 transition-colors"
           >
             <ArrowLeft size={18} />
