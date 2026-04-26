@@ -4,12 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
   Users, Plus, Heart, Shield, Briefcase, Building2,
-  Loader2, Link2, Search, Calendar, X,
-  CheckCircle2, Clock, XCircle, Ban, Check, UserX,
+  Loader2, Link as LinkIcon, Search, Calendar, X,
+  CheckCircle2, Clock, Check, UserX, MessageSquare, Unlink,
 } from "lucide-react";
 
 import {
-  useLinks, useCreateLink, useRespondLink,
+  useLinks, useCreateLink, useRespondLink, useEndLink,
   type Link as LinkType, type RespondLinkPayload,
 } from "@/hooks/useLinks";
 import { useSearch } from "@/hooks/useSearch";
@@ -23,10 +23,10 @@ import type { SearchUser } from "@/types";
 const STATUS_CONFIG: Record<LinkType["status"], {
   label: string; className: string; icon: React.ElementType;
 }> = {
-  PENDING:   { label: "Pendente",  className: "bg-amber-50 text-amber-700 border border-amber-200",  icon: Clock },
-  ACTIVE:    { label: "Ativo",     className: "bg-green-50 text-green-700 border border-green-200",  icon: CheckCircle2 },
-  ENDED:     { label: "Encerrado", className: "bg-gray-100 text-gray-500 border border-gray-200",    icon: XCircle },
-  CANCELLED: { label: "Cancelado", className: "bg-red-50 text-red-500 border border-red-100",        icon: Ban },
+  PENDING:   { label: "Pendente", className: "bg-amber-50 text-amber-700 border border-amber-200", icon: Clock },
+  ACTIVE:    { label: "Ativo",    className: "bg-green-50 text-green-700 border border-green-200", icon: CheckCircle2 },
+  ENDED:     { label: "Ativo",    className: "bg-green-50 text-green-700 border border-green-200", icon: CheckCircle2 },
+  CANCELLED: { label: "Pendente", className: "bg-amber-50 text-amber-700 border border-amber-200", icon: Clock },
 };
 
 const LINK_TYPE_CONFIG: Record<LinkType["link_type"], {
@@ -45,14 +45,12 @@ const ROLE_TO_LINK_TYPE: Record<string, LinkType["link_type"]> = {
   INSTITUTION:  "institution",
 };
 
-type FilterTab = "ALL" | LinkType["status"];
+type FilterTab = "ALL" | "ACTIVE" | "PENDING";
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: "ALL",       label: "Todos" },
-  { key: "ACTIVE",    label: "Ativos" },
-  { key: "PENDING",   label: "Pendentes" },
-  { key: "ENDED",     label: "Encerrados" },
-  { key: "CANCELLED", label: "Cancelados" },
+const FILTER_TABS: { key: FilterTab; label: string; icon: React.ElementType }[] = [
+  { key: "ALL",     label: "Todos",     icon: Users },
+  { key: "ACTIVE",  label: "Ativos",    icon: CheckCircle2 },
+  { key: "PENDING", label: "Pendentes", icon: Clock },
 ];
 
 // ─── Zod schema ──────────────────────────────────────────────────────────────
@@ -71,6 +69,10 @@ export const LinksPage = () => {
   const user = useAuthStore((s) => s.user);
 
   const [filter, setFilter]         = useState<FilterTab>("ALL");
+  const visibleLinks = useMemo(
+    () => links.filter((l) => l.status !== "ENDED" && l.status !== "CANCELLED"),
+    [links]
+  );
   const [search, setSearch]         = useState("");
   const [showModal, setShowModal]   = useState(false);
   const [formError, setFormError]   = useState<string | null>(null);
@@ -85,19 +87,19 @@ export const LinksPage = () => {
   });
 
   const filtered = useMemo(() => {
-    return links
+    return visibleLinks
       .filter((l) => filter === "ALL" || l.status === filter)
       .filter((l) =>
         !search.trim() ||
         l.other_party_name.toLowerCase().includes(search.toLowerCase())
       );
-  }, [links, filter, search]);
+  }, [visibleLinks, filter, search]);
 
   const stats = useMemo(() => ({
-    total:   links.length,
-    active:  links.filter((l) => l.status === "ACTIVE").length,
-    pending: links.filter((l) => l.status === "PENDING").length,
-  }), [links]);
+    total:   visibleLinks.length,
+    active:  visibleLinks.filter((l) => l.status === "ACTIVE").length,
+    pending: visibleLinks.filter((l) => l.status === "PENDING").length,
+  }), [visibleLinks]);
 
   const onSubmit = (data: CreateLinkForm) => {
     if (!userLinkType || !selectedElder) return;
@@ -119,10 +121,10 @@ export const LinksPage = () => {
 
       {/* ── Hero card ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div className="h-28 bg-gradient-to-br from-primary/80 to-blue-400/70" />
+        <div className="h-28 bg-gradient-to-br from-primary/25 to-primary/5" />
         <div className="px-6 pb-6">
           <div className="-mt-8 mb-4 w-16 h-16 rounded-2xl bg-white shadow-md border border-border/40 flex items-center justify-center flex-shrink-0">
-            <Link2 size={28} className="text-primary" />
+            <LinkIcon size={28} className="text-primary" />
           </div>
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
@@ -143,18 +145,18 @@ export const LinksPage = () => {
       {/* ── Toolbar ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text/35 pointer-events-none" />
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text/35 pointer-events-none" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome..."
-            className="w-full pl-10 pr-4 h-10 rounded-xl border border-border bg-white text-sm text-text/80 placeholder:text-text/35 font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
+            className="w-full h-12 pl-11 pr-4 rounded-2xl border border-border bg-white text-sm text-text/80 placeholder:text-text/35 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
           />
         </div>
         {canCreate && (
           <button
             onClick={openModal}
-            className="flex items-center gap-2 px-5 h-10 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-sm shadow-primary/20 flex-shrink-0"
+            className="flex items-center gap-2 px-5 h-12 rounded-2xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-sm shadow-primary/20 flex-shrink-0"
           >
             <Plus size={16} />
             Novo Vínculo
@@ -164,31 +166,36 @@ export const LinksPage = () => {
 
       {/* ── Filter tabs ───────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setFilter(tab.key)}
-            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-              filter === tab.key
-                ? "bg-primary text-white shadow-sm"
-                : "bg-white border border-border text-text/60 hover:border-primary/40 hover:text-primary"
-            }`}
-          >
-            {tab.label}
-            {tab.key !== "ALL" && links.filter((l) => l.status === tab.key).length > 0 && (
-              <span className={`ml-1.5 ${filter === tab.key ? "opacity-70" : "text-text/40"}`}>
-                {links.filter((l) => l.status === tab.key).length}
-              </span>
-            )}
-          </button>
-        ))}
+        {FILTER_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const count = tab.key !== "ALL" ? visibleLinks.filter((l) => l.status === tab.key).length : 0;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                filter === tab.key
+                  ? "bg-primary text-white shadow-sm"
+                  : "bg-white border border-border text-text/60 hover:border-primary/40 hover:text-primary"
+              }`}
+            >
+              <Icon size={13} />
+              {tab.label}
+              {count > 0 && (
+                <span className={`ml-0.5 ${filter === tab.key ? "opacity-70" : "text-text/40"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Content ───────────────────────────────────────────────────── */}
       {isLoading ? (
         <LoadingSkeleton />
       ) : filtered.length === 0 ? (
-        <EmptyState hasLinks={links.length > 0} canCreate={canCreate} onNew={openModal} />
+        <EmptyState hasLinks={visibleLinks.length > 0} canCreate={canCreate} onNew={openModal} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((link) => (
@@ -202,7 +209,7 @@ export const LinksPage = () => {
         <Modal onClose={closeModal}>
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center">
-              <Link2 size={20} className="text-primary" />
+              <LinkIcon size={20} className="text-primary" />
             </div>
             <div>
               <h2 className="text-base font-bold text-text">Solicitar novo vínculo</h2>
@@ -379,8 +386,10 @@ const LinkCard = ({ link, isElder }: { link: LinkType; isElder: boolean }) => {
   const statusConfig = STATUS_CONFIG[link.status];
   const StatusIcon   = statusConfig.icon;
   const TypeIcon     = typeConfig.Icon;
-  const { mutate: respond, isPending } = useRespondLink();
+  const { mutate: respond, isPending: isResponding } = useRespondLink();
+  const { mutate: endLink, isPending: isEnding } = useEndLink();
   const [respondError, setRespondError] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd]     = useState(false);
 
   const initials = link.other_party_name
     .split(" ")
@@ -394,6 +403,13 @@ const LinkCard = ({ link, isElder }: { link: LinkType; isElder: boolean }) => {
     respond(
       { link_type: link.link_type, link_id: link.id, action },
       { onError: (err) => setRespondError(resolveApiError(err, "Erro ao responder vínculo.")) }
+    );
+  };
+
+  const handleEnd = () => {
+    endLink(
+      { link_type: link.link_type, link_id: link.id },
+      { onError: (err) => setRespondError(resolveApiError(err, "Erro ao encerrar vínculo.")) }
     );
   };
 
@@ -418,6 +434,35 @@ const LinkCard = ({ link, isElder }: { link: LinkType; isElder: boolean }) => {
         </span>
       </div>
 
+      {/* Bio / summary */}
+      {link.other_party_bio && (
+        <p className="text-xs text-text/60 leading-relaxed bg-gray-50 rounded-xl px-3 py-2 border border-border/40">
+          {link.other_party_bio}
+        </p>
+      )}
+
+      {/* Role-specific detail chips */}
+      {link.other_party_extra && link.other_party_extra.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {link.other_party_extra.map((tag, i) => (
+            <span
+              key={i}
+              className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${typeConfig.avatarClass} border-current/10`}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Notes from requestor — shown to ELDER on PENDING links */}
+      {isElder && link.status === "PENDING" && link.notes && (
+        <div className="flex gap-2 items-start bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2">
+          <MessageSquare size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 leading-relaxed">{link.notes}</p>
+        </div>
+      )}
+
       {/* Respond actions — only for ELDER on PENDING links */}
       {isElder && link.status === "PENDING" && (
         <div className="space-y-2">
@@ -429,21 +474,58 @@ const LinkCard = ({ link, isElder }: { link: LinkType; isElder: boolean }) => {
           <div className="flex gap-2">
             <button
               onClick={() => handleRespond("approve")}
-              disabled={isPending}
+              disabled={isResponding}
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-green-50 border border-green-200 text-green-700 text-xs font-bold hover:bg-green-100 transition-colors disabled:opacity-50"
             >
-              {isPending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              {isResponding ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
               Aceitar
             </button>
             <button
               onClick={() => handleRespond("reject")}
-              disabled={isPending}
+              disabled={isResponding}
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors disabled:opacity-50"
             >
-              {isPending ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+              {isResponding ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
               Recusar
             </button>
           </div>
+        </div>
+      )}
+
+      {/* End active link */}
+      {link.status === "ACTIVE" && (
+        <div className="space-y-1.5">
+          {respondError && (
+            <p className="text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
+              {respondError}
+            </p>
+          )}
+          {confirmEnd ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmEnd(false)}
+                className="flex-1 h-9 rounded-xl border border-border text-xs font-semibold text-text/60 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEnd}
+                disabled={isEnding}
+                className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                {isEnding ? <Loader2 size={13} className="animate-spin" /> : <Unlink size={13} />}
+                Confirmar encerramento
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmEnd(true)}
+              className="w-full flex items-center justify-center gap-1.5 h-8 rounded-xl text-[11px] font-semibold text-text/40 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all"
+            >
+              <Unlink size={12} />
+              Encerrar vínculo
+            </button>
+          )}
         </div>
       )}
 
@@ -478,7 +560,7 @@ const EmptyState = ({
 }: { hasLinks: boolean; canCreate: boolean; onNew: () => void }) => (
   <div className="bg-white rounded-2xl border border-border shadow-sm p-12 flex flex-col items-center gap-4 text-center">
     <div className="w-16 h-16 rounded-2xl bg-primary-light/60 flex items-center justify-center">
-      <Link2 size={30} className="text-primary/60" />
+      <LinkIcon size={30} className="text-primary/60" />
     </div>
     <div className="space-y-1">
       <h3 className="font-bold text-text text-lg">

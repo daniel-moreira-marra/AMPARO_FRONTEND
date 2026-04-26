@@ -3,13 +3,18 @@ import { api } from "@/api/axios";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { User, ApiResponse } from "@/types";
 
-interface PublicUserInfo {
+export interface PublicUserInfo {
   id: number;
   full_name: string;
   role: string;
   avatar: string | null;
   city: string | null;
   state: string | null;
+  elder_profile_id: number | null;
+  profile: Record<string, any>;
+  email?: string | null;
+  phone?: string | null;
+  show_links?: boolean;
 }
 
 export function usePublicUser(userId: number | null) {
@@ -25,7 +30,7 @@ export function usePublicUser(userId: number | null) {
 }
 
 type ProfileUpdatePayload = Partial<
-  Pick<User, "full_name" | "phone" | "address_line" | "city" | "state" | "zip_code">
+  Pick<User, "full_name" | "phone" | "address_line" | "city" | "state" | "zip_code" | "show_email" | "show_phone" | "show_links">
 > & { avatar?: File };
 
 export function useProfile() {

@@ -7,10 +7,13 @@ export interface Link {
   status: "PENDING" | "ACTIVE" | "ENDED" | "CANCELLED";
   link_type: "caregiver" | "guardian" | "professional" | "institution";
   created_at: string;
+  notes?: string;
   elder_id: number;
   other_party_id: number | null;
   other_party_name: string;
   other_party_role: string;
+  other_party_bio?: string | null;
+  other_party_extra?: string[] | null;
 }
 
 export interface CreateLinkPayload {
@@ -75,5 +78,23 @@ export const useRespondLink = () => {
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
     onError: (err) => resolveApiError(err, "Erro ao responder vínculo."),
+  });
+};
+
+export interface EndLinkPayload {
+  link_type: "caregiver" | "guardian" | "professional" | "institution";
+  link_id: number;
+}
+
+export const useEndLink = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: EndLinkPayload) => {
+      const { data } = await api.post("/links/end/", payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links"] });
+    },
   });
 };

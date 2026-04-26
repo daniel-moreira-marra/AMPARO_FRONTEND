@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 
 import { useSearch } from "@/hooks/useSearch";
-import { ROLE_LABELS } from "@/constants/roles";
+import { ROLE_LABELS, getRoleStyle } from "@/constants/roles";
 import type { SearchUser, UserRole, SearchFilters } from "@/types";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -19,12 +19,8 @@ const ROLE_TABS: { role: UserRole | "ALL"; label: string; icon: React.ElementTyp
   { role: "GUARDIAN",    label: "Responsáveis",  icon: Shield },
 ];
 
-const ROLE_AVATAR_CLASS: Record<string, string> = {
-  CAREGIVER:    "bg-primary-light text-primary",
-  PROFESSIONAL: "bg-purple-50 text-purple-600",
-  INSTITUTION:  "bg-orange-50 text-orange-600",
-  GUARDIAN:     "bg-blue-50 text-blue-600",
-  ELDER:        "bg-emerald-50 text-emerald-600",
+const INSTITUTION_TYPE_LABELS: Record<string, string> = {
+  ILPI: "ILPI", SHELTER: "Abrigo", CLINIC: "Clínica", HOSPITAL: "Hospital",
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -62,10 +58,10 @@ export const SearchPage = () => {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div className="h-20 bg-gradient-to-br from-primary/70 to-blue-400/60" />
+        <div className="h-28 bg-gradient-to-br from-primary/25 to-primary/5" />
         <div className="px-6 pb-6">
-          <div className="-mt-7 mb-4 w-14 h-14 rounded-2xl bg-white shadow-md border border-border/40 flex items-center justify-center flex-shrink-0">
-            <Search size={24} className="text-primary" />
+          <div className="-mt-8 mb-4 w-16 h-16 rounded-2xl bg-white shadow-md border border-border/40 flex items-center justify-center flex-shrink-0">
+            <Search size={28} className="text-primary" />
           </div>
           <h1 className="text-xl font-bold text-text">Buscar na rede</h1>
           <p className="text-sm text-text/50 font-medium mt-0.5">Encontre cuidadores, profissionais e instituições</p>
@@ -81,7 +77,6 @@ export const SearchPage = () => {
           onChange={(e) => handleQueryChange(e.target.value)}
           placeholder="Buscar por nome, especialidade, cidade..."
           className="w-full h-12 pl-11 pr-4 rounded-2xl border border-border bg-white text-sm text-text/80 placeholder:text-text/35 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all"
-          autoFocus
         />
         {isFetching && (
           <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-primary/50" />
@@ -133,14 +128,17 @@ export const SearchPage = () => {
 // ─── UserCard ─────────────────────────────────────────────────────────────────
 
 const UserCard = ({ user, onClick }: { user: SearchUser; onClick: () => void }) => {
-  const avatarClass = ROLE_AVATAR_CLASS[user.role] ?? "bg-gray-100 text-gray-500";
-  const roleLabel   = ROLE_LABELS[user.role] ?? user.role;
-  const initials    = user.full_name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const roleStyle = getRoleStyle(user.role);
+  const roleLabel = ROLE_LABELS[user.role] ?? user.role;
+  const initials  = user.full_name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
   const subtitle = (() => {
     if (user.role === "PROFESSIONAL") return user.profession_display ?? user.profession ?? roleLabel;
     if (user.role === "CAREGIVER")    return user.bio ? user.bio.slice(0, 60) + (user.bio.length > 60 ? "…" : "") : roleLabel;
-    if (user.role === "INSTITUTION")  return user.institution_type ?? roleLabel;
+    if (user.role === "INSTITUTION") {
+      const t = user.institution_type;
+      return (t && t !== "OTHER") ? (INSTITUTION_TYPE_LABELS[t] ?? t) : roleLabel;
+    }
     return roleLabel;
   })();
 
@@ -152,7 +150,10 @@ const UserCard = ({ user, onClick }: { user: SearchUser; onClick: () => void }) 
       className="bg-white rounded-2xl border border-border/60 shadow-sm p-5 flex flex-col gap-3 text-left hover:shadow-md hover:border-primary/20 transition-all group"
     >
       <div className="flex items-start gap-3">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${avatarClass}`}>
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
+          style={{ background: roleStyle.lightBg, color: roleStyle.color }}
+        >
           {initials}
         </div>
         <div className="min-w-0 flex-1">
@@ -164,7 +165,10 @@ const UserCard = ({ user, onClick }: { user: SearchUser; onClick: () => void }) 
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/40">
-        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${avatarClass}`}>
+        <span
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+          style={{ background: roleStyle.lightBg, color: roleStyle.textColor }}
+        >
           {roleLabel}
         </span>
 

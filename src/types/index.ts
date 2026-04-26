@@ -7,7 +7,11 @@ export interface User {
   phone?: string;
   avatar?: string;
   is_verified: boolean;
+  onboarding_completed: boolean;
   role: UserRole;
+  show_email?: boolean;
+  show_phone?: boolean;
+  show_links?: boolean;
   address_line?: string;
   city?: string;
   state?: string;
@@ -32,6 +36,7 @@ export interface ElderProfile {
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   emergency_contact_relationship?: string;
+  share_medical_info?: boolean;
   is_active?: boolean;
 }
 
@@ -52,6 +57,7 @@ export interface GuardianProfile {
 
 export interface ProfessionalProfile {
   profession?: 'PHYSIOTHERAPIST' | 'SPEECH_THERAPIST' | 'OCCUPATIONAL_THERAPIST' | 'PSYCHOLOGIST' | 'NUTRITIONIST' | 'OTHER';
+  profession_other?: string;
   council?: string;
   license_number?: string;
   bio?: string;
@@ -125,11 +131,13 @@ export interface SearchFilters {
 
 export interface SharedPost {
   id: number;
+  author_id?: number;
   author_name: string;
   author_role?: string;
   text: string;
   image?: string;
   image_alt_text?: string;
+  images?: string[];
   created_at: string;
 }
 
@@ -138,6 +146,7 @@ export interface Post {
   content: string;
   image?: string;
   image_alt_text?: string;
+  images?: string[];
   tags?: string[];
   author: {
     id: number;
@@ -176,4 +185,20 @@ export interface AuthResponse {
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
+}
+
+export interface Notification {
+  id: number;
+  type: "LINK_REQUEST" | "LINK_ACCEPTED";
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  actor_name: string;
+  link_type: string;
+  link_id: number | null;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unread_count: number;
 }

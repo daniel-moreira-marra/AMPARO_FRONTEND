@@ -1,4 +1,3 @@
-import { FeedHeader } from "./FeedHeader";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightSidebar } from "./RightSidebar";
 
@@ -20,13 +19,7 @@ export const FeedLayout = ({ children }: FeedLayoutProps) => {
 
         {/* 2. COLUNA CENTRAL (Onde a mágica acontece) */}
         <section className="col-span-1 lg:col-span-9 xl:col-span-6 space-y-6">
-          {/* O Header de Filtros e Busca agora é parte integrante do Layout */}
-          <FeedHeader />
-          
-          {/* Aqui entram o CreatePostWidget e a Lista de Posts */}
-          <div className="space-y-6">
-            {children}
-          </div>
+          {children}
         </section>
 
         {/* 3. COLUNA DIREITA (Sugestões/Dicas) */}

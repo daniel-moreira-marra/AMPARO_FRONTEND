@@ -5,7 +5,13 @@
       "Bash(python manage.py migrate --settings=backend.settings.dev)",
       "Bash(python manage.py seed_test --settings=backend.settings.dev)",
       "Bash(python manage.py check)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/v1/search/ -H \"Accept: application/json\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/v1/search/ -H \"Accept: application/json\")",
+      "Bash(python manage.py migrate)",
+      "Bash(python manage.py migrate accounts)",
+      "Read(//c/Users/gabri/OneDrive/Desktop/developing/amparo/**)",
+      "Read(//mnt/c/Users/gabri/OneDrive/Desktop/developing/amparo/AMPARO_BACKEND/accounts/**)",
+      "Bash(python manage.py makemigrations links --name \"add_ended_status_to_guardian_link\")",
+      "Bash(python manage.py migrate links)"
     ],
     "additionalDirectories": [
       "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\accounts\\models",
@@ -17,7 +23,15 @@
       "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\links\\serializers",
       "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\search\\serializers",
       "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\backend",
-      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\accounts\\urls"
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\accounts\\urls",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\posts\\views",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\search\\views",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\posts\\models",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\posts\\migrations",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\posts\\selectors",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\accounts\\migrations",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\core\\pagination",
+      "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND"
     ]
   }
 }

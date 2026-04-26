@@ -1,19 +1,23 @@
 import Hero from "@/components/landing/Hero";
-import Features from "@/components/landing/Features";
-import CTASection from "@/components/landing/CTASection";
+import StatsBar from "@/components/landing/StatsBar";
+import HowItWorks from "@/components/landing/HowItWorks";
+import ForWho from "@/components/landing/ForWho";
 import Testimonials from "@/components/landing/Testimonials";
-
-
+import CTASection from "@/components/landing/CTASection";
 
 export default function LandingPage() {
   return (
-    <div className="flex flex-col scroll-smooth">
-        <main>
-            <Hero />
-            <div id="como-funciona"><Features /></div>
-            <div id="depoimentos"><Testimonials /></div>            
-            <CTASection />
-        </main>      
-    </div>
+    <main className="flex flex-col scroll-smooth">
+      <Hero />
+      <StatsBar />
+      <div id="como-funciona">
+        <HowItWorks />
+      </div>
+      <ForWho />
+      <div id="depoimentos">
+        <Testimonials />
+      </div>
+      <CTASection />
+    </main>
   );
 }
