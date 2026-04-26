@@ -11,7 +11,8 @@
       "Read(//c/Users/gabri/OneDrive/Desktop/developing/amparo/**)",
       "Read(//mnt/c/Users/gabri/OneDrive/Desktop/developing/amparo/AMPARO_BACKEND/accounts/**)",
       "Bash(python manage.py makemigrations links --name \"add_ended_status_to_guardian_link\")",
-      "Bash(python manage.py migrate links)"
+      "Bash(python manage.py migrate links)",
+      "Bash(python manage.py check --deploy)"
     ],
     "additionalDirectories": [
       "c:\\Users\\gabri\\OneDrive\\Desktop\\developing\\amparo\\AMPARO_BACKEND\\accounts\\models",
