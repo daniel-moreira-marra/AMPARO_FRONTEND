@@ -12,6 +12,9 @@ import { api } from "@/api/axios";
 import { resolveApiError } from "@/utils/apiError";
 import type { User, AuthResponse, ApiResponse } from "@/types";
 
+
+// ================= VALIDATION =================
+
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(1, "Informe sua senha"),
