@@ -7,12 +7,10 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import AuthLayout from "@/components/auth/AuthLayout";
 import AuthHero from "@/components/auth/AuthHero";
 import AuthForm from "@/components/auth/AuthForm";
-
 import { useAuthStore } from "@/store/useAuthStore";
 import { api } from "@/api/axios";
-
-import type { User } from "@/types";
-import type { AuthResponse } from "@/types";
+import { resolveApiError } from "@/utils/apiError";
+import type { User, AuthResponse, ApiResponse } from "@/types";
 
 
 // ================= VALIDATION =================
@@ -24,18 +22,13 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-
-// ================= PAGE =================
-
 export default function LoginPage() {
-
   const [serverError, setServerError] = useState<string | null>(null);
-
   const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || "/feed";
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/feed";
 
   const {
     register,
@@ -45,46 +38,26 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-
-  // ================= SUBMIT =================
-
   const onSubmit = async (data: LoginForm) => {
     setServerError(null);
-
     try {
-      const response = await api.post<AuthResponse>("/auth/token/", data);
-      const { access, refresh } = response.data.data;
+      const tokenRes = await api.post<ApiResponse<AuthResponse>>("/auth/token/", data);
+      const { access, refresh } = tokenRes.data.data;
 
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-
-      const meResponse = await api.get("/auth/me/");
-      const user: User = meResponse.data;
+      const meRes = await api.get<ApiResponse<User>>("/auth/me/", {
+        headers: { Authorization: `Bearer ${access}` },
+      });
+      const user: User = meRes.data.data;
 
       setAuth(access, refresh, user);
-      navigate(from, { replace: true });
-
-    } catch (err: any) {
-
-      // Credenciais inválidas
-      if (err.response?.status === 401 || err.response?.status === 400) {
-        setServerError("Credenciais inválidas. Verifique seu email e senha.");
-        return;
-      }
-
-      // Erro do servidor
-      if (err.response) {
-        setServerError("Ocorreu um erro. Tente novamente mais tarde.");
-        return;
-      }
-
-      // Falha de conexão
-      setServerError("Falha de conexão. Verifique sua internet.");
+      navigate(user.is_verified ? from : "/signup-success", { replace: true });
+    } catch (err) {
+      setServerError(resolveApiError(err, "Não foi possível fazer login. Tente novamente."));
     }
   };
 
-
-  // ================= UI =================
+  const inputClass =
+    "w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary";
 
   return (
     <AuthLayout
@@ -113,50 +86,37 @@ export default function LoginPage() {
                 Criar conta
               </Link>
             </p>
-
             <Link to="/forgot-password" className="text-blue hover:underline">
               Esqueceu sua senha?
             </Link>
           </div>
         }
       >
-
-        {/* EMAIL */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-text">Email</label>
-
           <input
             type="email"
             {...register("email")}
             placeholder="seu@email.com"
-            className="w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary"
+            className={inputClass}
           />
-
           {errors.email && (
-            <p className="text-sm text-red-500">
-              {errors.email.message}
-            </p>
+            <p className="text-sm text-red-500">{errors.email.message}</p>
           )}
         </div>
 
-        {/* PASSWORD */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-text">Senha</label>
-
           <input
             type="password"
             {...register("password")}
             placeholder="••••••••"
-            className="w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary"
+            className={inputClass}
           />
-
           {errors.password && (
-            <p className="text-sm text-red-500">
-              {errors.password.message}
-            </p>
+            <p className="text-sm text-red-500">{errors.password.message}</p>
           )}
         </div>
-
       </AuthForm>
     </AuthLayout>
   );

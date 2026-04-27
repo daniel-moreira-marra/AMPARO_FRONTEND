@@ -1,215 +1,492 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate, Link } from "react-router-dom";
-import { HeartHandshake } from "lucide-react";
+import { Eye, EyeOff, Check, Loader2, MapPin, X as XIcon } from "lucide-react";
+import type { UseFormRegisterReturn } from "react-hook-form";
 
+import AuthLayout from "@/components/auth/AuthLayout";
+import AuthHero from "@/components/auth/AuthHero";
+import AuthForm from "@/components/auth/AuthForm";
 import { api } from "@/api/axios";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { useToast } from "@/hooks/use-toast"
+import { maskPhone, maskCEP, CEP_REGEX } from "@/utils/masks";
+import { resolveApiError } from "@/utils/apiError";
+import { fetchAddressByCep } from "@/utils/viaCep";
+import { ROLE_OPTIONS } from "@/constants/roles";
+import { useAuthStore } from "@/store/useAuthStore";
+import type { AuthResponse, ApiResponse, User } from "@/types";
 
-const signupSchema = z.object({
-    full_name: z.string().min(1, "Nome completo é obrigatório"),
-    email: z.string().email("Email inválido"),
-    phone: z.string().min(1, "Telefone é obrigatório"),
-    role: z.enum(["ELDER", "CAREGIVER", "FAMILY", "PROFESSIONAL", "INSTITUTION"]),
-    password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
-    confirmPassword: z.string().min(6, "Confirmação de senha obrigatória"),
-}).refine((data) => data.password === data.confirmPassword, {
-    message: "As senhas não conferem",
-    path: ["confirmPassword"],
-});
+// ─── Styling ────────────────────────────────────────────────────────────────
+
+const inputClass =
+  "w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all";
+
+// ─── Password Requirements ───────────────────────────────────────────────────
+
+const PASSWORD_REQUIREMENTS = [
+  { key: "length",  label: "6+ caracteres",      test: (v: string) => v.length >= 6 },
+  { key: "upper",   label: "Maiúscula (A–Z)",     test: (v: string) => /[A-Z]/.test(v) },
+  { key: "lower",   label: "Minúscula (a–z)",     test: (v: string) => /[a-z]/.test(v) },
+  { key: "number",  label: "Número (0–9)",        test: (v: string) => /[0-9]/.test(v) },
+  { key: "special", label: "Caractere especial",  test: (v: string) => /[^A-Za-z0-9]/.test(v) },
+] as const;
+
+// ─── Zod Schema ──────────────────────────────────────────────────────────────
+
+const signupSchema = z
+  .object({
+    // Step 1
+    full_name:        z.string().min(2, "Informe seu nome completo"),
+    email:            z.string().email("Email inválido"),
+    password: z
+      .string()
+      .min(6, "Mínimo 6 caracteres")
+      .refine((v) => /[A-Z]/.test(v),       "Letra maiúscula necessária")
+      .refine((v) => /[a-z]/.test(v),       "Letra minúscula necessária")
+      .refine((v) => /[0-9]/.test(v),       "Número necessário")
+      .refine((v) => /[^A-Za-z0-9]/.test(v), "Caractere especial necessário"),
+    confirm_password: z.string().min(1, "Confirme sua senha"),
+    role:             z.string().min(1, "Selecione o seu perfil"),
+
+    // Step 2
+    phone:        z.string().min(14, "Telefone inválido"),
+    zip_code:     z.string().regex(CEP_REGEX, "CEP inválido (00000-000)"),
+    address_line: z.string().min(3, "Informe o logradouro"),
+    number:       z.string().min(1, "Informe o número"),
+    complement:   z.string().optional(),
+    city:         z.string().min(2, "Busque pelo CEP para preencher a cidade"),
+    state:        z.string().length(2, "Busque pelo CEP para preencher o estado"),
+  })
+  .refine((d) => d.password === d.confirm_password, {
+    path: ["confirm_password"],
+    message: "As senhas não coincidem",
+  });
 
 type SignupForm = z.infer<typeof signupSchema>;
 
-export const SignupPage = () => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [globalError, setGlobalError] = useState<string | null>(null);
-    const navigate = useNavigate();
+type CepStatus = "idle" | "loading" | "found" | "error";
 
-    const { register, handleSubmit, setValue, watch, setError, formState: { errors } } = useForm<SignupForm>({
-        resolver: zodResolver(signupSchema),
-        defaultValues: {
-            role: "ELDER"
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function SignupPage() {
+  const [step, setStep]             = useState(1);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [cepStatus, setCepStatus]   = useState<CepStatus>("idle");
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    trigger,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupForm>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { role: "", phone: "", zip_code: "", complement: "" },
+  });
+
+  const passwordValue = watch("password") ?? "";
+  const confirmValue  = watch("confirm_password") ?? "";
+
+  // ── CEP lookup ─────────────────────────────────────────────────────────────
+
+  const handleCepChange = async (maskedCep: string) => {
+    const digits = maskedCep.replace(/\D/g, "");
+
+    if (digits.length < 8) {
+      if (cepStatus !== "idle") setCepStatus("idle");
+      return;
+    }
+
+    setCepStatus("loading");
+    try {
+      const result = await fetchAddressByCep(maskedCep);
+      if (!result) {
+        setCepStatus("error");
+        return;
+      }
+      setValue("address_line", result.logradouro || "", { shouldValidate: true });
+      setValue("city",         result.localidade  || "", { shouldValidate: true });
+      setValue("state",        result.uf          || "", { shouldValidate: true });
+      setCepStatus("found");
+    } catch {
+      setCepStatus("error");
+    }
+  };
+
+  // ── Step navigation ────────────────────────────────────────────────────────
+
+  const handleNextStep = async () => {
+    const valid = await trigger([
+      "full_name", "email", "password", "confirm_password", "role",
+    ]);
+    if (valid) setStep(2);
+  };
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+
+  const onSubmit = async (data: SignupForm) => {
+    setServerError(null);
+    try {
+      const addressLine = data.complement
+        ? `${data.address_line}, ${data.number} - ${data.complement}`
+        : `${data.address_line}, ${data.number}`;
+
+      const signupRes = await api.post<ApiResponse<User>>("/auth/signup/", {
+        email:        data.email,
+        password:     data.password,
+        full_name:    data.full_name,
+        phone:        data.phone.replace(/\D/g, ""),
+        role:         data.role,
+        address_line: addressLine,
+        city:         data.city,
+        state:        data.state,
+        zip_code:     data.zip_code.replace(/\D/g, ""),
+      });
+
+      const tokenRes = await api.post<ApiResponse<AuthResponse>>("/auth/token/", {
+        email:    data.email,
+        password: data.password,
+      });
+      const { access, refresh } = tokenRes.data.data;
+
+      // Build user from signup response — avoids calling /me/ on an unverified account
+      const newUser: User = { ...signupRes.data.data, is_verified: false };
+      setAuth(access, refresh, newUser);
+
+      navigate("/signup-success", { replace: true });
+    } catch (err) {
+      setServerError(resolveApiError(err, "Não foi possível criar a conta. Tente novamente."));
+    }
+  };
+
+  const addressLocked = cepStatus === "found";
+
+  return (
+    <AuthLayout
+      hero={
+        <AuthHero
+          logo={<img src="/images/logo-amparo.svg" className="w-40" />}
+          title="Cuidar de quem importa, juntos"
+          subtitle="Conecte-se a uma rede de cuidado, apoio e confiança para viver e cuidar melhor todos os dias."
+          imageSrc="/images/auth-hero2.jpeg"
+        />
+      }
+    >
+      <AuthForm
+        headerIcon={<img src="/images/amparo-icon.svg" className="w-10" />}
+        title="Criar conta"
+        description={`Etapa ${step} de 2`}
+        submitLabel={step === 1 ? "Continuar" : "Criar conta"}
+        onSubmit={
+          step === 1
+            ? (e) => { e.preventDefault(); handleNextStep(); }
+            : handleSubmit(onSubmit)
         }
-    });
-
-    useEffect(() => {
-        if (Object.keys(errors).length > 0) {
-            console.log("Form errors state changed:", errors);
+        error={serverError}
+        isLoading={isSubmitting}
+        footer={
+          <p>
+            Já possui uma conta?{" "}
+            <Link to="/login" className="text-primary font-medium hover:underline">
+              Fazer login
+            </Link>
+          </p>
         }
-    }, [errors]);
+      >
+        {/* ════════════════════════════════ STEP 1 ══════════════════════════════ */}
+        {step === 1 && (
+          <>
+            <FieldWrapper label="Nome completo" error={errors.full_name?.message}>
+              <input
+                {...register("full_name")}
+                placeholder="Seu nome completo"
+                className={inputClass}
+              />
+            </FieldWrapper>
 
-    const onSubmit = async (data: SignupForm) => {
-        setIsLoading(true);
-        setGlobalError(null);
-        try {
-            // Some backends might choke if an invalid/expired token is sent in the header even for public routes.
-            // We use the custom _skipAuth flag to prevent the interceptor from adding the token.
-            await api.post("/auth/signup/", {
-                email: data.email,
-                password: data.password,
-                full_name: data.full_name,
-                phone: data.phone,
-                role: data.role
-            }, {
-                // @ts-ignore: Custom flag for interceptor
-                _skipAuth: true
-            });
+            <FieldWrapper label="Email" error={errors.email?.message}>
+              <input
+                type="email"
+                {...register("email")}
+                placeholder="seu@email.com"
+                className={inputClass}
+              />
+            </FieldWrapper>
 
-            navigate("/login", { state: { message: "Conta criada com sucesso! Faça login." } });
+            {/* Password with live requirements */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text">Senha</label>
+              <PasswordToggleInput register={register("password")} />
+              {errors.password && !passwordValue && (
+                <p className="text-sm text-red-500">{errors.password.message}</p>
+              )}
 
-        } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-            console.error("Signup error catch:", err);
+              {/* Live requirements grid */}
+              {passwordValue.length > 0 && (
+                <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                  {PASSWORD_REQUIREMENTS.map((req) => {
+                    const met = req.test(passwordValue);
+                    return (
+                      <div
+                        key={req.key}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                          met
+                            ? "bg-primary-light/50 text-primary border-primary/20"
+                            : "bg-gray-50 text-text/40 border-gray-100"
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                            met ? "bg-primary" : "bg-gray-200"
+                          }`}
+                        >
+                          {met && <Check size={9} className="text-white" strokeWidth={3} />}
+                        </span>
+                        {req.label}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-            const responseData = err.response?.data;
-            if (responseData) {
-                // Handle Amparo structured error format
-                if (responseData.error) {
-                    const errorObj = responseData.error;
+            {/* Confirm password with match indicator */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-text">Confirmar senha</label>
+              <PasswordToggleInput register={register("confirm_password")} />
+              {/* Show Zod error only on form submit attempt */}
+              {errors.confirm_password && (
+                <p className="text-sm text-red-500">{errors.confirm_password.message}</p>
+              )}
+              {/* Live match indicator */}
+              {confirmValue.length > 0 && !errors.confirm_password && (
+                <p
+                  className={`text-xs font-medium flex items-center gap-1 transition-colors ${
+                    passwordValue === confirmValue ? "text-primary" : "text-text/40"
+                  }`}
+                >
+                  {passwordValue === confirmValue ? (
+                    <><Check size={12} /> Senhas coincidem</>
+                  ) : (
+                    "As senhas ainda não coincidem"
+                  )}
+                </p>
+              )}
+            </div>
 
-                    // 1. Map details to field errors
-                    if (errorObj.details) {
-                        Object.keys(errorObj.details).forEach((key) => {
-                            const fieldKey = key as keyof SignupForm;
-                            const fieldMessages = errorObj.details[fieldKey];
-                            const firstMessage = Array.isArray(fieldMessages) ? fieldMessages[0] : null;
+            <FieldWrapper label="Perfil" error={errors.role?.message}>
+              <Controller
+                name="role"
+                control={control}
+                render={({ field }) => (
+                  <select {...field} className={inputClass}>
+                    <option value="">Selecione o seu perfil</option>
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              />
+            </FieldWrapper>
+          </>
+        )}
 
-                            if (firstMessage && typeof firstMessage === 'string') {
-                                setError(fieldKey, {
-                                    type: "manual",
-                                    message: firstMessage
-                                });
-                            }
-                        });
-                    }
+        {/* ════════════════════════════════ STEP 2 ══════════════════════════════ */}
+        {step === 2 && (
+          <>
+            <FieldWrapper label="Telefone" error={errors.phone?.message}>
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    {...field}
+                    maxLength={15}
+                    onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                    placeholder="(11) 99999-9999"
+                    className={inputClass}
+                  />
+                )}
+              />
+            </FieldWrapper>
 
-                    // 2. Set global error message
-                    if (errorObj.message) {
-                        setGlobalError(errorObj.message);
-                        return;
-                    }
-                }
+            {/* CEP with automatic lookup */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-text">CEP</label>
+              <div className="relative">
+                <Controller
+                  name="zip_code"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      {...field}
+                      maxLength={9}
+                      onChange={(e) => {
+                        const masked = maskCEP(e.target.value);
+                        field.onChange(masked);
+                        handleCepChange(masked);
+                      }}
+                      placeholder="00000-000"
+                      className={`${inputClass} pr-10`}
+                    />
+                  )}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  {cepStatus === "loading" && <Loader2 size={16} className="animate-spin text-text/40" />}
+                  {cepStatus === "found"   && <Check   size={16} className="text-primary" />}
+                  {cepStatus === "error"   && <XIcon   size={16} className="text-red-400" />}
+                  {cepStatus === "idle"    && <MapPin  size={16} className="text-text/20" />}
+                </span>
+              </div>
+              {errors.zip_code && (
+                <p className="text-sm text-red-500">{errors.zip_code.message}</p>
+              )}
+              {cepStatus === "error" && (
+                <p className="text-xs text-amber-600 font-medium">
+                  CEP não encontrado — preencha o endereço manualmente abaixo.
+                </p>
+              )}
+            </div>
 
-                // Fallback for non-structured or missing message
-                if (typeof responseData === 'string') {
-                    setGlobalError(responseData);
-                } else if (typeof responseData === 'object') {
-                    // Avoid [object Object] and false values
-                    const messages = Object.entries(responseData)
-                        .filter(([key]) => key !== 'success')
-                        .map(([_, v]) => {
-                            if (typeof v === 'string') return v;
-                            if (Array.isArray(v) && typeof v[0] === 'string') return v[0];
-                            if (v && typeof v === 'object' && (v as any).message) return (v as any).message;
-                            return null;
-                        })
-                        .filter(Boolean);
+            {/* Logradouro + Número (side by side) */}
+            <div className="space-y-1">
+              <div className="flex gap-2">
+                <span className="flex-1 text-sm font-medium text-text">Logradouro</span>
+                <span className="w-[88px] text-sm font-medium text-text">Número</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  {...register("address_line")}
+                  placeholder="Rua, avenida..."
+                  readOnly={addressLocked}
+                  className={`flex-1 h-12 px-4 rounded-xl border border-border transition-all ${
+                    addressLocked
+                      ? "bg-gray-50 text-text/70 cursor-default"
+                      : "focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  }`}
+                />
+                <input
+                  {...register("number")}
+                  placeholder="Ex: 42"
+                  className="w-[88px] h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+                />
+              </div>
+              <div className="flex gap-2 text-sm text-red-500">
+                <span className="flex-1">{errors.address_line?.message}</span>
+                <span className="w-[88px]">{errors.number?.message}</span>
+              </div>
+            </div>
 
-                    setGlobalError(messages.length > 0 ? messages.join(", ") : "Erro ao criar conta.");
-                } else {
-                    setGlobalError("Erro ao criar conta.");
-                }
-            } else {
-                setGlobalError("Ocorreu um erro ao entrar em contato com o servidor. Tente novamente.");
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
+            {/* Complement (optional) */}
+            <FieldWrapper label="Complemento (opcional)">
+              <input
+                {...register("complement")}
+                placeholder="Apto 12, bloco B, casa..."
+                className={inputClass}
+              />
+            </FieldWrapper>
 
-    return (
-        <div className="flex flex-1 items-center justify-center px-4 py-8">
-            <Card className="w-full max-w-md">
-                <CardHeader className="space-y-1 text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <HeartHandshake className="h-6 w-6" />
-                        </div>
-                    </div>
-                    <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
-                    <CardDescription>
-                        Junte-se ao Amparo para cuidar e conectar
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-                        <div className="space-y-2">
-                            <Label htmlFor="full_name">Nome Completo</Label>
-                            <Input id="full_name" {...register("full_name")} />
-                            {errors.full_name && <p className="text-xs text-destructive">{errors.full_name.message}</p>}
-                        </div>
+            {/* Cidade + UF (auto-filled, locked when found) */}
+            <div className="space-y-1">
+              <div className="flex gap-2">
+                <span className="flex-1 text-sm font-medium text-text">Cidade</span>
+                <span className="w-[72px] text-sm font-medium text-text">UF</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  {...register("city")}
+                  placeholder="Preenchida pelo CEP"
+                  readOnly={addressLocked}
+                  className={`flex-1 h-12 px-4 rounded-xl border border-border transition-all ${
+                    addressLocked
+                      ? "bg-gray-50 text-text/70 cursor-default"
+                      : "focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  }`}
+                />
+                <input
+                  {...register("state")}
+                  placeholder="UF"
+                  maxLength={2}
+                  readOnly={addressLocked}
+                  className={`w-[72px] h-12 px-3 text-center uppercase rounded-xl border border-border transition-all ${
+                    addressLocked
+                      ? "bg-gray-50 text-text/70 cursor-default"
+                      : "focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  }`}
+                />
+              </div>
+              {(errors.city || errors.state) && (
+                <p className="text-sm text-red-500">
+                  {errors.city?.message ?? errors.state?.message}
+                </p>
+              )}
+            </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" placeholder="nome@exemplo.com" {...register("email")} />
-                            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-                        </div>
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="text-sm text-text/70 hover:underline pt-1"
+            >
+              ← Voltar
+            </button>
+          </>
+        )}
+      </AuthForm>
+    </AuthLayout>
+  );
+}
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Telefone</Label>
-                                <Input id="phone" placeholder="(00) 00000-0000" {...register("phone")} />
-                                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="role">Perfil</Label>
-                                <Select
-                                    onValueChange={(val: "ELDER" | "CAREGIVER" | "FAMILY" | "PROFESSIONAL" | "INSTITUTION") => setValue("role", val)}
-                                    defaultValue={watch("role") || "ELDER"}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecione" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="ELDER">Idoso</SelectItem>
-                                        <SelectItem value="CAREGIVER">Cuidador</SelectItem>
-                                        <SelectItem value="FAMILY">Familiar</SelectItem>
-                                        <SelectItem value="PROFESSIONAL">Profissional</SelectItem>
-                                        <SelectItem value="INSTITUTION">Instituição</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
-                            </div>
-                        </div>
+// ─── Helper Components ────────────────────────────────────────────────────────
 
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Senha</Label>
-                            <Input id="password" type="password" {...register("password")} />
-                            {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-                        </div>
+interface FieldWrapperProps {
+  label?: string;
+  error?: string;
+  children: React.ReactNode;
+}
 
-                        <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                            <Input id="confirmPassword" type="password" {...register("confirmPassword")} />
-                            {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
-                        </div>
+function FieldWrapper({ label, error, children }: FieldWrapperProps) {
+  return (
+    <div className="space-y-1">
+      {label && <label className="text-sm font-medium text-text">{label}</label>}
+      {children}
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
 
-                        {globalError && (
-                            <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm font-medium">
-                                {globalError}
-                            </div>
-                        )}
+interface PasswordToggleInputProps {
+  register: UseFormRegisterReturn;
+  placeholder?: string;
+}
 
-                        <Button type="submit" className="w-full" disabled={isLoading}>
-                            {isLoading ? "Criando conta..." : "Criar Conta"}
-                        </Button>
-                    </form>
-                </CardContent>
-                <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
-                    <div>
-                        Já tem uma conta?{" "}
-                        <Link to="/login" className="text-primary hover:underline font-medium">
-                            Entrar
-                        </Link>
-                    </div>
-                </CardFooter>
-            </Card>
-        </div>
-    );
-};
+function PasswordToggleInput({ register, placeholder = "••••••••" }: PasswordToggleInputProps) {
+  const [visible, setVisible] = useState(false);
+  const inputClass =
+    "w-full h-12 px-4 rounded-xl border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all";
+
+  return (
+    <div className="relative">
+      <input
+        type={visible ? "text" : "password"}
+        {...register}
+        placeholder={placeholder}
+        className={`${inputClass} pr-12`}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-text/50 hover:text-text transition-colors"
+      >
+        {visible ? <EyeOff size={20} /> : <Eye size={20} />}
+      </button>
+    </div>
+  );
+}
