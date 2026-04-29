@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search, Users, Heart, Shield, Briefcase, Building2,
-  MapPin, Star, Clock, Loader2, UserX, ChevronDown,
+  MapPin, Star, Clock, Loader2, UserX,
 } from "lucide-react";
 
 import { useSearch } from "@/hooks/useSearch";

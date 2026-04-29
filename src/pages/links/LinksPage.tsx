@@ -10,7 +10,7 @@ import {
 
 import {
   useLinks, useCreateLink, useRespondLink, useEndLink,
-  type Link as LinkType, type RespondLinkPayload,
+  type Link as LinkType,
 } from "@/hooks/useLinks";
 import { useSearch } from "@/hooks/useSearch";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -82,7 +82,7 @@ export const LinksPage = () => {
   const isElder      = user?.role === "ELDER";
   const canCreate    = !!userLinkType;
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateLinkForm>({
+  const { register, handleSubmit, reset } = useForm<CreateLinkForm>({
     resolver: zodResolver(createLinkSchema),
   });
 

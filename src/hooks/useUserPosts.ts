@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/axios";
-import type { Post, ApiResponse } from "@/types";
+import type { ApiResponse } from "@/types";
 import { type ApiFeedPost, normalizePost } from "@/hooks/useFeed";
 
 export function useUserPosts(userId: number | null) {

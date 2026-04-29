@@ -1,5 +1,4 @@
 import { Search, X, Hash } from "lucide-react";
-import { ROLE_LABELS } from "@/constants/roles";
 import type { UserRole } from "@/types";
 import type { FeedFilters } from "@/hooks/useFeed";
 

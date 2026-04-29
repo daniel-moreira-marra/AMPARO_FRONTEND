@@ -10,12 +10,13 @@ import { useForm } from "react-hook-form";
 
 import { usePublicLinks, useCreateLink, useLinks } from "@/hooks/useLinks";
 import { usePublicUser } from "@/hooks/useProfile";
-import { useUserPosts, type UserPost } from "@/hooks/useUserPosts";
+import { useUserPosts } from "@/hooks/useUserPosts";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROLE_LABELS, getRoleStyle, type RoleStyle } from "@/constants/roles";
 import { formatRelativeTime } from "@/utils/formatDate";
 import { resolveApiError } from "@/utils/apiError";
 import type { Link as LinkType } from "@/hooks/useLinks";
+import type { Post } from "@/types";
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
 
@@ -388,7 +389,7 @@ const InfoRow = ({ icon, text, bold, textClass }: { icon: React.ReactNode; text:
 const PostCard = ({
   post, authorName, authorInitials, roleStyle,
 }: {
-  post: UserPost;
+  post: Post;
   authorName: string;
   authorInitials: string;
   roleStyle: RoleStyle;
@@ -407,7 +408,7 @@ const PostCard = ({
       </div>
     </div>
 
-    <p className="text-sm text-text/80 font-medium leading-relaxed whitespace-pre-wrap">{post.text}</p>
+    <p className="text-sm text-text/80 font-medium leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
     {post.image && (
       <img src={post.image} alt={post.image_alt_text || ""} className="w-full rounded-xl object-cover max-h-72" />

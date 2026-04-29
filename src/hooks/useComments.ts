@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/axios";
-import type { Comment, PaginatedResponse } from "@/types";
+import type { Comment, PaginatedResponse, ApiResponse } from "@/types";
 import { useIncrementCommentCount } from "./usePostActions";
 
 interface ApiComment extends Comment {

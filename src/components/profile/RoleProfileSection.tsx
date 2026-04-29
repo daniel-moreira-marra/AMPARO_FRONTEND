@@ -103,7 +103,7 @@ const Toggle = ({ label, checked, onChange, disabled }: { label: string; checked
 
 // ─── Role-specific form bodies ────────────────────────────────────────────────
 
-const ElderForm = ({ data, register, control, setValue, watch, disabled }: any) => (
+const ElderForm = ({ register, control, setValue, watch, disabled }: any) => (
   <div className="space-y-6">
     <FormGroup label="Identificação">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -169,7 +169,7 @@ const ElderForm = ({ data, register, control, setValue, watch, disabled }: any) 
   </div>
 );
 
-const CaregiverForm = ({ register, control, watch, setValue, disabled }: any) => {
+const CaregiverForm = ({ register, watch, setValue, disabled }: any) => {
   const selected: string[] = watch("care_types_input") ?? [];
   const toggle = (v: string) => setValue(
     "care_types_input",

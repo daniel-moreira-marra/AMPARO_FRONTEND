@@ -10,7 +10,7 @@ import {
   Mail, Phone, Shield, Heart, ShieldCheck, ShieldAlert, Eye,
 } from "lucide-react";
 
-import { useProfile, usePublicUser, type PublicUserInfo } from "@/hooks/useProfile";
+import { useProfile, usePublicUser } from "@/hooks/useProfile";
 import { useRoleProfile } from "@/hooks/useRoleProfile";
 import { usePublicLinks, useCreateLink, useLinks } from "@/hooks/useLinks";
 import { useUserPosts } from "@/hooks/useUserPosts";
@@ -19,7 +19,6 @@ import { FeedItem } from "@/components/feed/FeedItem";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROLE_LABELS, getRoleStyle, type RoleStyle } from "@/constants/roles";
 import { RoleProfileSection, type RoleProfileRef } from "@/components/profile/RoleProfileSection";
-import { formatRelativeTime } from "@/utils/formatDate";
 import { resolveApiError } from "@/utils/apiError";
 import { maskPhone, maskCEP } from "@/utils/masks";
 import { fetchAddressByCep } from "@/utils/viaCep";
