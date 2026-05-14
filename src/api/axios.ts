@@ -17,10 +17,24 @@ export const api = axios.create({
   },
 });
 
+const publicRoutes = [
+  '/auth/token/',
+  '/auth/signup/',
+  '/auth/password-reset/',
+  '/auth/password-reset/confirm/',
+  '/auth/verify-email/',
+];
+
 api.interceptors.request.use(
   (config: AmparoRequestConfig) => {
-    if (config._skipAuth) return config;
+    // Se a requisição já pede para pular, ou se a rota estiver na lista pública, segue em frente sem Token
+    const isPublicRoute = publicRoutes.some(route => config.url?.includes(route));
+    
+    if (config._skipAuth || isPublicRoute) {
+      return config;
+    }
 
+    // Injeta o token apenas nas rotas protegidas
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

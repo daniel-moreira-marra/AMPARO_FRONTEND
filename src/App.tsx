@@ -15,6 +15,9 @@ import { BaseLayout } from "@/components/layout/BaseLayout";
 import { LandingLayout } from "@/components/layout/LandingLayout";
 import { FeedLayout } from "@/components/layout/feed/FeedLayout";
 import { useAuthStore } from "@/store/useAuthStore";
+import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
+import { ConfirmEmailPage } from "./pages/auth/ConfirmEmailPage";
 
 import LandingPage from "@/pages/LandingPage";
 import SignupPage from "@/pages/auth/SignupPage";
@@ -50,6 +53,10 @@ function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
       </Route>
+
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/confirmar-email" element={<ConfirmEmailPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<UnverifiedOnlyRoute />}>
